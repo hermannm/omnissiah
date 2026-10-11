@@ -35,6 +35,7 @@ Omnissiah (pronounced _omni-sigh-ah_) is a thin, opinionated wrapper around
   ```
 - Add an entry to `CHANGELOG.md` (with the current date)
     - Remember to update the link section, and bump the version for the `[Unreleased]` link
+- Bump `Command.Version` in `main.go`
 - Create commit and tag for the release (update `TAG` variable in below command):
   ```
   TAG=vX.Y.Z && git commit -m "Release ${TAG}" && git tag -a "${TAG}" -m "Release ${TAG}" && git log --oneline -2
