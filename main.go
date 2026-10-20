@@ -9,7 +9,9 @@ import (
 	"hermannm.dev/devlog"
 	"hermannm.dev/devlog/errlog"
 	"hermannm.dev/devlog/sloginit"
+	"hermannm.dev/omnissiah/config"
 	"hermannm.dev/omnissiah/sbx"
+	"hermannm.dev/wrap"
 )
 
 func main() {
@@ -47,7 +49,17 @@ func main() {
 }
 
 func pray(ctx context.Context, _ *cli.Command) error {
-	if err := sbx.Run(ctx, "claude"); err != nil {
+	cfg, err := config.Load()
+	if err != nil {
+		return wrap.Error(err, "failed to load Omnissiah config")
+	}
+
+	project, err := cfg.GetCurrentProject()
+	if err != nil {
+		return wrap.Error(err, "failed to get current project")
+	}
+
+	if err := sbx.Run(ctx, project.Model, project.Path); err != nil {
 		return err
 	}
 

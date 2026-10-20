@@ -10,10 +10,10 @@ import (
 	"hermannm.dev/wrap"
 )
 
-func Run(ctx context.Context, agentName string) error {
+func Run(ctx context.Context, model string, path string) error {
 	// Always run in clone mode, so the agent doesn't edit our own files:
 	// https://docs.docker.com/ai/sandboxes/usage/#clone-mode
-	return sbx(ctx, "run", "--clone", agentName)
+	return sbx(ctx, "run", "--clone", model, path)
 }
 
 func sbx(ctx context.Context, args ...string) error {

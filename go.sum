@@ -1,5 +1,7 @@
 github.com/fatih/color v1.19.0 h1:Zp3PiM21/9Ld6FzSKyL5c/BULoe/ONr9KlbYVOfG8+w=
 github.com/fatih/color v1.19.0/go.mod h1:zNk67I0ZUT1bEGsSGyCZYZNrHuTkJJB+r6Q9VuMi0LE=
+github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=
+github.com/goccy/go-yaml v1.19.2/go.mod h1:XBurs7gK8ATbW4ZPGKgcbrY1Br56PdM69F7LkFRi1kA=
 github.com/mattn/go-colorable v0.1.15 h1:+u9SLTRGnXv73cEsnsmoZBom+dMU88B2M0aDcWy0/jY=
 github.com/mattn/go-colorable v0.1.15/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.22 h1:j8l17JJ9i6VGPUFUYoTUKPSgKe/83EYU2zBC7YNKMw4=
@@ -24,5 +26,7 @@ golang.org/x/term v0.47.0 h1:cpyOwQkr2Nzxe2p6KnrTG7Ei2wtzjsuSjhpXXepZ/BM=
 golang.org/x/term v0.47.0/go.mod h1:efAfAuG6RKABvg1ArGebRkvX6LXul14SM67o2e4mUCY=
 hermannm.dev/devlog v0.7.0 h1:SW4LiDTISco31MGOTGYapM9NNMlPXjSNw4jO3O4utaM=
 hermannm.dev/devlog v0.7.0/go.mod h1:AOZiOHU+uKt+qNC0H7NF64IVqdzeXrsZCga3/qO3FlI=
+hermannm.dev/errclose v0.1.1 h1:0yoQ9bfYZY5jrahNEz0i15lEzXtesMaxNx0SsJeR5xc=
+hermannm.dev/errclose v0.1.1/go.mod h1:d37zQVc6Cw438AaKn1s5b29HjeTMBIAjBXcRApwUVCE=
 hermannm.dev/wrap v0.5.0 h1:ONXhqQKVti5PYPj8pil8yuMWDAsgTk0WZaSVqrIGe9o=
 hermannm.dev/wrap v0.5.0/go.mod h1:6CZLAyxA2eB97kfZ0TfL3LHozZMf9OjMOTmwxnEm5PI=
