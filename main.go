@@ -9,9 +9,10 @@ import (
 	"hermannm.dev/devlog"
 	"hermannm.dev/devlog/errlog"
 	"hermannm.dev/devlog/sloginit"
+	"hermannm.dev/wrap"
+
 	"hermannm.dev/omnissiah/config"
 	"hermannm.dev/omnissiah/sbx"
-	"hermannm.dev/wrap"
 )
 
 func main() {
@@ -20,6 +21,7 @@ func main() {
 		&devlog.Options{TimeFormat: devlog.TimeFormatNone, RenameErrorAttrKey: "cause"},
 	)
 
+	//exhaustruct:ignore
 	cmd := &cli.Command{
 		Name:    "omnissiah",
 		Usage:   "A thin, opinionated wrapper around Docker Sandboxes for praying to machine spirits (a.k.a. sandboxing AI agents)",
@@ -30,6 +32,11 @@ func main() {
 				Aliases: []string{"p"},
 				Usage:   "Start a new Omnissiah session in the current Git repo",
 				Action:  pray,
+			},
+			{
+				Name:   "awaken",
+				Usage:  "Initialize Omnissiah config and set sbx defaults",
+				Action: awaken,
 			},
 		},
 		EnableShellCompletion: true,
@@ -61,6 +68,14 @@ func pray(ctx context.Context, _ *cli.Command) error {
 
 	if err := sbx.Run(ctx, project.Model, project.Path); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func awaken(_ context.Context, _ *cli.Command) error {
+	if err := config.Initialize(); err != nil {
+		return wrap.Error(err, "failed to initialize Omnissiah config")
 	}
 
 	return nil

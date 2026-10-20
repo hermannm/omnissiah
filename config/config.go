@@ -1,7 +1,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -35,7 +38,7 @@ func Load() (cfg Config, returnedErr error) {
 		return Config{}, wrap.ErrorWithAttrs(
 			err,
 			"failed to open config file",
-			"path", absoluteConfigPath,
+			"path", configPath,
 		)
 	}
 	defer errclose.Close(configFile, &returnedErr, "config file")
@@ -44,7 +47,7 @@ func Load() (cfg Config, returnedErr error) {
 		return Config{}, wrap.ErrorWithAttrs(
 			err,
 			"failed to parse config file as YAML",
-			"path", absoluteConfigPath,
+			"path", configPath,
 		)
 	}
 
@@ -56,7 +59,7 @@ func Load() (cfg Config, returnedErr error) {
 			return Config{}, wrap.ErrorWithAttrs(
 				err,
 				"either 'defaultModel' or 'project.model' must be set in config",
-				"path", absoluteConfigPath,
+				"path", configPath,
 			)
 		}
 	}
@@ -89,6 +92,49 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 	}
 
 	return project, nil
+}
+
+func Initialize() (returnErr error) {
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return wrap.Error(err, "could not get user home dir")
+	}
+	absoluteConfigPath := expandHomedir(configPath, homedir)
+
+	if fileExists(absoluteConfigPath) {
+		slog.Info(fmt.Sprintf("%s already exists, skipping initialization", configPath))
+		return nil
+	}
+
+	file, err := os.Create(absoluteConfigPath)
+	if err != nil {
+		return wrap.ErrorWithAttrs(
+			err,
+			"failed to create Omnissiah config file",
+			"path", configPath,
+		)
+	}
+	defer errclose.Closef(file, &returnErr, "config file %s", configPath)
+
+	encoder := yaml.NewEncoder(file)
+	defer errclose.Close(encoder, &returnErr, "YAML encoder")
+
+	startingConfig := Config{
+		DefaultModel: "claude",
+		Projects:     []Project{{Path: "~/example", Model: ""}},
+	}
+
+	if err := encoder.Encode(startingConfig); err != nil {
+		return wrap.Error(err, "failed to encode config YAML")
+	}
+
+	slog.Info("Initialized Omnissiah config", "path", configPath, "config", startingConfig)
+	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !errors.Is(err, fs.ErrNotExist)
 }
 
 func expandHomedir(path string, homedir string) (expandedPath string) {
