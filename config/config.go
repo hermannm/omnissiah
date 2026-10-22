@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -19,6 +20,9 @@ type Config struct {
 	// STC = Standard Template Construct = AI model.
 	DefaultSTC string    `yaml:"defaultSTC,omitempty"`
 	Projects   []Project `yaml:"projects"`
+	// Omitted from YAML, since we set this ourselves.
+	//exhaustruct:optional
+	Path Path `yaml:"-"`
 }
 
 type Project struct {
@@ -27,32 +31,31 @@ type Project struct {
 	STC string `yaml:"STC,omitempty"`
 }
 
-const configPath = "~/omnissiah.yml"
-
 func Load() (cfg Config, returnedErr error) {
 	homedir, err := os.UserHomeDir()
 	if err != nil {
 		return Config{}, wrap.Error(err, "could not get user home dir")
 	}
-	absoluteConfigPath := expandHomedir(configPath, homedir)
+	configPath := getConfigPath(homedir)
 
-	configFile, err := os.Open(absoluteConfigPath)
+	configFile, err := os.Open(configPath.Absolute)
 	if err != nil {
 		return Config{}, wrap.ErrorWithAttrs(
 			err,
 			"failed to open config file",
-			"path", configPath,
+			"path", configPath.Short,
 		)
 	}
-	defer errclose.Close(configFile, &returnedErr, "config file")
+	defer errclose.Closef(configFile, &returnedErr, "config file %s", configPath.Short)
 
 	if err := yaml.NewDecoder(configFile).Decode(&cfg); err != nil {
 		return Config{}, wrap.ErrorWithAttrs(
 			err,
 			"failed to parse config file as YAML",
-			"path", configPath,
+			"path", configPath.Short,
 		)
 	}
+	cfg.Path = configPath
 
 	// Expand uses of ~ in project paths
 	for i, project := range cfg.Projects {
@@ -62,7 +65,7 @@ func Load() (cfg Config, returnedErr error) {
 			return Config{}, wrap.ErrorWithAttrs(
 				err,
 				"either `defaultSTC` or `project.STC` must be set in config",
-				"path", configPath,
+				"path", configPath.Short,
 			)
 		}
 	}
@@ -85,7 +88,7 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 	if !ok {
 		return Project{}, fmt.Errorf(
 			"'%s' is not a configured project path in %s",
-			path, configPath,
+			path, cfg.Path.Short,
 		)
 	}
 
@@ -101,37 +104,75 @@ func Initialize() (returnErr error) {
 	if err != nil {
 		return wrap.Error(err, "could not get user home dir")
 	}
-	absoluteConfigPath := expandHomedir(configPath, homedir)
+	configPath := getConfigPath(homedir)
 
-	if fileExists(absoluteConfigPath) {
+	if fileExists(configPath.Absolute) {
 		slog.Info(fmt.Sprintf("%s already exists, skipping initialization", configPath))
 		return nil
 	}
 
-	file, err := os.Create(absoluteConfigPath)
+	configDir, _ := filepath.Split(configPath.Absolute)
+	if err := os.MkdirAll(configDir, configDirPermissions); err != nil {
+		return wrap.ErrorWithAttrs(
+			err,
+			"failed to create directory for Omnissiah config",
+			"path", configPath.Short,
+		)
+	}
+
+	configFile, err := os.Create(configPath.Absolute)
 	if err != nil {
 		return wrap.ErrorWithAttrs(
 			err,
 			"failed to create Omnissiah config file",
-			"path", configPath,
+			"path", configPath.Short,
 		)
 	}
-	defer errclose.Closef(file, &returnErr, "config file %s", configPath)
+	defer errclose.Closef(configFile, &returnErr, "config file %s", configPath.Short)
 
-	encoder := yaml.NewEncoder(file)
+	encoder := yaml.NewEncoder(configFile)
 	defer errclose.Close(encoder, &returnErr, "YAML encoder")
 
 	startingConfig := Config{
 		DefaultSTC: "claude",
-		Projects:   []Project{{Path: "~/example", STC: ""}},
+		Projects:   []Project{{Path: filepath.Join("~", "example"), STC: ""}},
 	}
 
 	if err := encoder.Encode(startingConfig); err != nil {
 		return wrap.Error(err, "failed to encode config YAML")
 	}
 
-	slog.Info("Initialized Omnissiah config", "path", configPath, "config", startingConfig)
+	slog.Info("Initialized Omnissiah config", "path", configPath.Short, "config", startingConfig)
 	return nil
+}
+
+// File permissions used by most under directories under `~/.config`.
+const configDirPermissions = 0755
+
+type Path struct {
+	Absolute string
+	Short    string
+}
+
+func getConfigPath(homedir string) Path {
+	// Honor XDG_CONFIG_HOME env variable for config file directory
+	// https://specifications.freedesktop.org/basedir/latest/
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		// Default to ~/.config
+		configHome = filepath.Join("~", ".config")
+	} else {
+		// If XDG_CONFIG_HOME is set, collapse home dir in path to ~, so we can return both variants
+		// below
+		configHome = collapseHomedir(configHome, homedir)
+	}
+
+	path := filepath.Join(configHome, "omnissiah", "config.yml")
+
+	return Path{
+		Absolute: expandHomedir(path, homedir),
+		Short:    path,
+	}
 }
 
 func fileExists(path string) bool {
@@ -141,4 +182,8 @@ func fileExists(path string) bool {
 
 func expandHomedir(path string, homedir string) (expandedPath string) {
 	return strings.Replace(path, "~", homedir, 1)
+}
+
+func collapseHomedir(path string, homedir string) (collapsedPath string) {
+	return strings.Replace(path, homedir, "~", 1)
 }
