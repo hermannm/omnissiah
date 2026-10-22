@@ -15,6 +15,8 @@ import (
 	"hermannm.dev/devlog/sloginit"
 	"hermannm.dev/wrap"
 
+	"hermannm.dev/omnissiah/internal/color"
+
 	"hermannm.dev/omnissiah/config"
 	"hermannm.dev/omnissiah/sbx"
 )
@@ -163,6 +165,8 @@ func pray(ctx context.Context, args prayArgs) error {
 			return fmt.Errorf("machine spirit with name '%s' already exists", args.Name)
 		}
 	}
+
+	fmt.Printf("Praying to %v...\n", color.Red.On(args.Name)) //nolint:forbidigo
 
 	if err := sbx.Run(ctx, args.Name, project.Model, project.Path); err != nil {
 		return err
