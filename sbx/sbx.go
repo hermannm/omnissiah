@@ -16,6 +16,23 @@ func Run(ctx context.Context, model string, path string) error {
 	return sbx(ctx, "run", "--clone", model, path)
 }
 
+type Setting string
+
+// https://docs.docker.com/ai/sandboxes/configuration/settings/
+const (
+	SettingSshAgentForwardingEnabled Setting = "ssh.agentForwardingEnabled"
+	SettingSkillsDefaultMode                 = "skills.defaultMode"
+	SettingDiagnosticsAutoUpload             = "diagnostics.autoUpload"
+)
+
+func SetSetting(ctx context.Context, setting Setting, value string) error {
+	return sbx(ctx, "settings", "set", string(setting), value)
+}
+
+func RestartDaemon(ctx context.Context) error {
+	return sbx(ctx, "daemon", "restart")
+}
+
 func sbx(ctx context.Context, args ...string) error {
 	cmd := exec.CommandContext(ctx, "sbx", args...)
 

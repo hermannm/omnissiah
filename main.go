@@ -73,10 +73,37 @@ func pray(ctx context.Context, _ *cli.Command) error {
 	return nil
 }
 
-func awaken(_ context.Context, _ *cli.Command) error {
+func awaken(ctx context.Context, _ *cli.Command) error {
 	if err := config.Initialize(); err != nil {
 		return wrap.Error(err, "failed to initialize Omnissiah config")
 	}
+
+	sbxSettings := map[sbx.Setting]string{
+		// We don't want the agent to inherit our SSH privileges (for Git operations, use scoped
+		// tokens with HTTP instead)
+		sbx.SettingSshAgentForwardingEnabled: "false",
+		// Ensure that the agent can never write to shared skill files
+		sbx.SettingSkillsDefaultMode: "readonly",
+		// Disable sending diagnostics, since "collected logs can still contain user content":
+		// https://docs.docker.com/ai/sandboxes/troubleshooting/#enable-automatic-diagnostics-uploads
+		sbx.SettingDiagnosticsAutoUpload: "false",
+	}
+	for setting, value := range sbxSettings {
+		if err := sbx.SetSetting(ctx, setting, value); err != nil {
+			return wrap.ErrorWithAttrs(
+				err,
+				"failed to set sbx setting",
+				"setting", setting,
+				"value", value,
+			)
+		}
+	}
+	slog.Info("Configured sbx default settings", "settings", sbxSettings)
+
+	if err := sbx.RestartDaemon(ctx); err != nil {
+		return wrap.Error(err, "failed to restart sbx daemon")
+	}
+	slog.Info("Restarted sbx daemon to apply settings")
 
 	return nil
 }
