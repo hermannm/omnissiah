@@ -259,6 +259,11 @@ linters:
       # Default: false
       allow-empty-returns: true
 
+    # [project-specific] Allows fmt.Print et al
+    forbidigo:
+      forbid:
+        - pattern: ^print(ln)?$
+
     funcorder:
       # Checks if the exported methods of a structure are placed before the non-exported ones.
       # Default: true
