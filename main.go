@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
+	"slices"
+	"strconv"
 
 	"github.com/urfave/cli/v3"
 	"hermannm.dev/devlog"
@@ -33,10 +36,11 @@ func main() {
 				Action: awaken,
 			},
 			{
-				Name:    "pray",
-				Aliases: []string{"p"},
-				Usage:   "Start a new Omnissiah session in the current Git repo",
-				Action:  pray,
+				Name:      "pray",
+				Aliases:   []string{"p"},
+				Usage:     "Start a new Omnissiah session in the current Git repo",
+				Action:    pray,
+				ArgsUsage: "[name] (optional - defaults to incrementing numeric name)",
 			},
 			{
 				Name:    "cortex",
@@ -96,7 +100,7 @@ func awaken(ctx context.Context, _ *cli.Command) error {
 	return nil
 }
 
-func pray(ctx context.Context, _ *cli.Command) error {
+func pray(ctx context.Context, cmd *cli.Command) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return wrap.Error(err, "failed to load Omnissiah config")
@@ -107,11 +111,78 @@ func pray(ctx context.Context, _ *cli.Command) error {
 		return wrap.Error(err, "failed to get current project")
 	}
 
-	if err := sbx.Run(ctx, project.Model, project.Path); err != nil {
+	existingSpirits, err := sbx.List(ctx)
+	if err != nil {
+		return wrap.Error(err, "failed to list machine spirits for giving name to the new one")
+	}
+
+	name := cmd.Args().First()
+	if name == "" {
+		// If no name is given: Set numeric name (0, 1, 2...)
+		name = getNumericNameForMachineSpirit(existingSpirits)
+	} else {
+		// If name is given: check that it's unique (otherwise sbx reattaches to existing sandbox,
+		// which we reserve for the `commune` command)
+		if slices.ContainsFunc(
+			existingSpirits,
+			func(spirit sbx.Sandbox) bool {
+				return spirit.Name == name
+			},
+		) {
+			return fmt.Errorf("machine spirit with name '%s' already exists", name)
+		}
+	}
+
+	if err := sbx.Run(ctx, name, project.Model, project.Path); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func getNumericNameForMachineSpirit(existingSpirits []sbx.Sandbox) string {
+	existingNumericNames := make([]int, 0, len(existingSpirits))
+
+	for _, spirit := range existingSpirits {
+		numericName, err := strconv.Atoi(spirit.Name)
+		if err == nil {
+			existingNumericNames = append(existingNumericNames, numericName)
+		}
+	}
+
+	switch len(existingNumericNames) {
+	case 0:
+		return formatNumericName(0)
+	case 1:
+		if existingNumericNames[0] == 0 {
+			return formatNumericName(1)
+		} else {
+			return formatNumericName(0)
+		}
+	default:
+		var previousName int
+		for i, name := range existingNumericNames {
+			if i == 0 {
+				previousName = name
+				continue
+			}
+
+			if name-previousName > 1 {
+				return formatNumericName(previousName + 1)
+			}
+			previousName = name
+		}
+		return formatNumericName(previousName + 1)
+	}
+}
+
+func formatNumericName(name int) string {
+	nameString := strconv.Itoa(name)
+	if len(nameString) == 1 {
+		return "0" + nameString
+	} else {
+		return nameString
+	}
 }
 
 func cortex(ctx context.Context, _ *cli.Command) error {
