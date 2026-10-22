@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"slices"
-	"strconv"
 
 	"github.com/urfave/cli/v3"
 	"hermannm.dev/devlog"
@@ -118,8 +119,11 @@ func pray(ctx context.Context, cmd *cli.Command) error {
 
 	name := cmd.Args().First()
 	if name == "" {
-		// If no name is given: Set numeric name (0, 1, 2...)
-		name = getNumericNameForMachineSpirit(existingSpirits)
+		// If no name is given: Get random name from [machineSpiritNames]
+		name, err = getRandomNameForMachineSpirit(existingSpirits, defaultRand())
+		if err != nil {
+			return wrap.Error(err, "failed to get random name for machine spirit")
+		}
 	} else {
 		// If name is given: check that it's unique (otherwise sbx reattaches to existing sandbox,
 		// which we reserve for the `commune` command)
@@ -140,49 +144,52 @@ func pray(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func getNumericNameForMachineSpirit(existingSpirits []sbx.Sandbox) string {
-	existingNumericNames := make([]int, 0, len(existingSpirits))
+func getRandomNameForMachineSpirit(existingSpirits []sbx.Sandbox, rng *rand.Rand) (string, error) {
+	availableNames := make([]string, 0, len(machineSpiritNames))
 
-	for _, spirit := range existingSpirits {
-		numericName, err := strconv.Atoi(spirit.Name)
-		if err == nil {
-			existingNumericNames = append(existingNumericNames, numericName)
+	for _, name := range machineSpiritNames {
+		if !slices.ContainsFunc(
+			existingSpirits,
+			func(spirit sbx.Sandbox) bool {
+				return spirit.Name == name
+			},
+		) {
+			availableNames = append(availableNames, name)
 		}
 	}
 
-	switch len(existingNumericNames) {
-	case 0:
-		return formatNumericName(0)
-	case 1:
-		if existingNumericNames[0] == 0 {
-			return formatNumericName(1)
-		} else {
-			return formatNumericName(0)
-		}
-	default:
-		var previousName int
-		for i, name := range existingNumericNames {
-			if i == 0 {
-				previousName = name
-				continue
-			}
-
-			if name-previousName > 1 {
-				return formatNumericName(previousName + 1)
-			}
-			previousName = name
-		}
-		return formatNumericName(previousName + 1)
+	if len(availableNames) == 0 {
+		return "", errors.New(
+			"all random names taken - either kill an existing machine spirit, or set name explicitly",
+		)
 	}
+
+	randomIndex := rng.IntN(len(availableNames))
+	return availableNames[randomIndex], nil
 }
 
-func formatNumericName(name int) string {
-	nameString := strconv.Itoa(name)
-	if len(nameString) == 1 {
-		return "0" + nameString
-	} else {
-		return nameString
-	}
+func defaultRand() *rand.Rand {
+	// #nosec G404 - Weak randomness is sufficient here
+	return rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+}
+
+var machineSpiritNames = []string{
+	"bax",
+	"bix",
+	"dax",
+	"fex",
+	"gix",
+	"hax",
+	"jax",
+	"kex",
+	"lux",
+	"mox",
+	"nux",
+	"pex",
+	"rax",
+	"tox",
+	"vox",
+	"zyx",
 }
 
 func cortex(ctx context.Context, _ *cli.Command) error {

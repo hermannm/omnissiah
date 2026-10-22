@@ -2,9 +2,13 @@
 package main
 
 import (
+	"errors"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"hermannm.dev/omnissiah/utils"
 
 	"hermannm.dev/omnissiah/sbx"
 )
@@ -14,42 +18,51 @@ func TestGetNumericNameForMachineSpirit(t *testing.T) {
 		Test            string
 		ExistingSpirits []sbx.Sandbox
 		ExpectedName    string
+		ExpectedError   error
 	}
 
 	cases := []testCase{
 		{
 			Test:            "No existing spirits",
 			ExistingSpirits: []sbx.Sandbox{},
-			ExpectedName:    "00",
+			ExpectedName:    machineSpiritNames[0],
 		},
 		{
-			Test:            "1 existing spirit",
-			ExistingSpirits: []sbx.Sandbox{{Name: "00"}},
-			ExpectedName:    "01",
+			Test: "1 existing spirit",
+			ExistingSpirits: []sbx.Sandbox{
+				{Name: machineSpiritNames[0]},
+			},
+			ExpectedName: machineSpiritNames[1],
 		},
 		{
-			Test:            "1 existing spirit with higher name index",
-			ExistingSpirits: []sbx.Sandbox{{Name: "01"}},
-			ExpectedName:    "00",
+			Test: "1 existing spirit with higher name index",
+			ExistingSpirits: []sbx.Sandbox{
+				{Name: machineSpiritNames[1]},
+			},
+			ExpectedName: machineSpiritNames[0],
 		},
 		{
 			Test: "Multiple existing spirits",
 			ExistingSpirits: []sbx.Sandbox{
-				{Name: "00"},
+				{Name: machineSpiritNames[0]},
 				{Name: "feature-a"},
-				{Name: "01"},
+				{Name: machineSpiritNames[1]},
+				{Name: machineSpiritNames[3]},
 			},
-			ExpectedName: "02",
+			ExpectedName: machineSpiritNames[2],
 		},
 		{
-			Test: "Existing spirits with non-contiguous names",
-			ExistingSpirits: []sbx.Sandbox{
-				{Name: "00"},
-				{Name: "02"},
-				{Name: "feature-b"},
-				{Name: "03"},
-			},
-			ExpectedName: "01",
+			Test: "All random names taken",
+			ExistingSpirits: utils.Map(
+				machineSpiritNames,
+				func(name string) sbx.Sandbox {
+					return sbx.Sandbox{Name: name}
+				},
+			),
+			ExpectedName: "",
+			ExpectedError: errors.New(
+				"all random names taken - either kill an existing machine spirit, or set name explicitly",
+			),
 		},
 	}
 
@@ -57,9 +70,21 @@ func TestGetNumericNameForMachineSpirit(t *testing.T) {
 		t.Run(
 			test.Test,
 			func(t *testing.T) {
-				name := getNumericNameForMachineSpirit(test.ExistingSpirits)
+				rng := rand.New(&incrementingRandSource{count: 0})
+				name, err := getRandomNameForMachineSpirit(test.ExistingSpirits, rng)
 				require.Equal(t, test.ExpectedName, name)
+				require.Equal(t, test.ExpectedError, err)
 			},
 		)
 	}
+}
+
+type incrementingRandSource struct {
+	count uint64
+}
+
+func (source *incrementingRandSource) Uint64() uint64 {
+	value := source.count
+	source.count++
+	return value
 }
