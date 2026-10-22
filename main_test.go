@@ -8,8 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"hermannm.dev/omnissiah/utils"
-
+	"hermannm.dev/omnissiah/internal/sliceutil"
 	"hermannm.dev/omnissiah/sbx"
 )
 
@@ -53,7 +52,7 @@ func TestGetNumericNameForMachineSpirit(t *testing.T) {
 		},
 		{
 			Test: "All random names taken",
-			ExistingSpirits: utils.Map(
+			ExistingSpirits: sliceutil.Map(
 				machineSpiritNames,
 				func(name string) sbx.Sandbox {
 					return sbx.Sandbox{Name: name}
