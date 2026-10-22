@@ -48,6 +48,10 @@ func TerminalUI(ctx context.Context) error {
 	return sbx(ctx, "tui")
 }
 
+func Prune(ctx context.Context) error {
+	return sbx(ctx, "prune")
+}
+
 func List(ctx context.Context) ([]Sandbox, error) {
 	output, err := sbxOutput(ctx, "ls", "--json")
 	if err != nil {

@@ -49,6 +49,12 @@ func main() {
 				Usage:   "Open the Cybernetica Cortex: the machine spirit control center",
 				Action:  cortex,
 			},
+			{
+				Name:    "exterminatus",
+				Aliases: []string{"e"},
+				Usage:   "Commence Exterminatus on all machine spirits, killing them",
+				Action:  exterminatus,
+			},
 		},
 		EnableShellCompletion: true,
 		Authors:               []any{"Hermann Mørkrid"},
@@ -194,4 +200,8 @@ var machineSpiritNames = []string{
 
 func cortex(ctx context.Context, _ *cli.Command) error {
 	return sbx.TerminalUI(ctx)
+}
+
+func exterminatus(ctx context.Context, _ *cli.Command) error {
+	return sbx.Prune(ctx)
 }
