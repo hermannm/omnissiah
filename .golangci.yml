@@ -282,6 +282,7 @@ linters:
     gocritic:
       disabled-checks:
         - ifElseChain # Unhelpful
+        - elseif # Unhelpful
       # Settings passed to gocritic.
       # The settings key is the name of a supported gocritic checker.
       # The list of supported checkers can be found at https://go-critic.com/overview.
