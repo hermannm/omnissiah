@@ -25,6 +25,8 @@ func main() {
 		&devlog.Options{TimeFormat: devlog.TimeFormatNone, RenameErrorAttrKey: "cause"},
 	)
 
+	var prayArgs prayArgs
+
 	//exhaustruct:ignore
 	cmd := &cli.Command{
 		Name:    "omnissiah",
@@ -32,33 +34,49 @@ func main() {
 		Version: "0.1.0",
 		Commands: []*cli.Command{
 			{
-				Name:   "awaken",
-				Usage:  "Initialize Omnissiah config and set sbx defaults",
-				Action: awaken,
+				Name:  "awaken",
+				Usage: "Initialize Omnissiah config and set sbx defaults",
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					return awaken(ctx)
+				},
 			},
 			{
-				Name:      "pray",
-				Aliases:   []string{"p"},
-				Usage:     "Start a new Omnissiah session in the current Git repo",
-				Action:    pray,
-				ArgsUsage: "[name] (optional - defaults to incrementing numeric name)",
+				Name:    "pray",
+				Aliases: []string{"p"},
+				Usage:   "Start a new Omnissiah session in the current Git repo",
+				Arguments: []cli.Argument{
+					&cli.StringArg{
+						Name:        "name",
+						Required:    false,
+						UsageText:   "[name] (optional - defaults to random 3-letter name)",
+						Destination: &prayArgs.Name,
+					},
+				},
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					return pray(ctx, prayArgs)
+				},
 			},
 			{
 				Name:    "cortex",
 				Aliases: []string{"cc"},
 				Usage:   "Open the Cybernetica Cortex: the machine spirit control center",
-				Action:  cortex,
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					return cortex(ctx)
+				},
 			},
 			{
 				Name:    "exterminatus",
 				Aliases: []string{"e"},
 				Usage:   "Commence Exterminatus on all machine spirits, killing them",
-				Action:  exterminatus,
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					return exterminatus(ctx)
+				},
 			},
 		},
 		EnableShellCompletion: true,
 		Authors:               []any{"Hermann Mørkrid"},
 	}
+
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		// If sbx gave an exit error: use same exit code and don't log, as sbx likely already logged
 		// Otherwise: log the error and exit with code 1
@@ -72,7 +90,7 @@ func main() {
 	}
 }
 
-func awaken(ctx context.Context, _ *cli.Command) error {
+func awaken(ctx context.Context) error {
 	if err := config.Initialize(); err != nil {
 		return wrap.Error(err, "failed to initialize Omnissiah config")
 	}
@@ -107,7 +125,11 @@ func awaken(ctx context.Context, _ *cli.Command) error {
 	return nil
 }
 
-func pray(ctx context.Context, cmd *cli.Command) error {
+type prayArgs struct {
+	Name string
+}
+
+func pray(ctx context.Context, args prayArgs) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return wrap.Error(err, "failed to load Omnissiah config")
@@ -123,10 +145,9 @@ func pray(ctx context.Context, cmd *cli.Command) error {
 		return wrap.Error(err, "failed to list machine spirits for giving name to the new one")
 	}
 
-	name := cmd.Args().First()
-	if name == "" {
+	if args.Name == "" {
 		// If no name is given: Get random name from [machineSpiritNames]
-		name, err = getRandomNameForMachineSpirit(existingSpirits, defaultRand())
+		args.Name, err = getRandomNameForMachineSpirit(existingSpirits, defaultRand())
 		if err != nil {
 			return wrap.Error(err, "failed to get random name for machine spirit")
 		}
@@ -136,14 +157,14 @@ func pray(ctx context.Context, cmd *cli.Command) error {
 		if slices.ContainsFunc(
 			existingSpirits,
 			func(spirit sbx.Sandbox) bool {
-				return spirit.Name == name
+				return spirit.Name == args.Name
 			},
 		) {
-			return fmt.Errorf("machine spirit with name '%s' already exists", name)
+			return fmt.Errorf("machine spirit with name '%s' already exists", args.Name)
 		}
 	}
 
-	if err := sbx.Run(ctx, name, project.Model, project.Path); err != nil {
+	if err := sbx.Run(ctx, args.Name, project.Model, project.Path); err != nil {
 		return err
 	}
 
@@ -198,10 +219,10 @@ var machineSpiritNames = []string{
 	"zyx",
 }
 
-func cortex(ctx context.Context, _ *cli.Command) error {
+func cortex(ctx context.Context) error {
 	return sbx.TerminalUI(ctx)
 }
 
-func exterminatus(ctx context.Context, _ *cli.Command) error {
+func exterminatus(ctx context.Context) error {
 	return sbx.Prune(ctx)
 }
