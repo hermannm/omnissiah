@@ -1,4 +1,4 @@
-<img alt="A hooded robot head" width="125" height="125" src="https://github.com/hermannm/omnissiah/blob/89e1bc0dcd26a2ad2d03d5b426a953ce04dfb726/omnissiah.png?raw=true" />
+<img alt="A hooded robot head" width="150" height="150" src="https://github.com/hermannm/omnissiah/blob/fa484f612593850c0e89aa46a9c38c9bde58095f/omnissiah.png?raw=true" />
 
 # omnissiah
 
