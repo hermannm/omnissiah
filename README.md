@@ -1,3 +1,5 @@
+<img alt="A hooded robot head" width="125" height="125" src="https://github.com/hermannm/omnissiah/blob/89e1bc0dcd26a2ad2d03d5b426a953ce04dfb726/omnissiah.png?raw=true" />
+
 # omnissiah
 
 The Omnissiah (pronounced _omni-sigh-ah_) is a thin, opinionated wrapper around
@@ -14,6 +16,7 @@ sandboxing AI agents).
 - [Usage](#usage)
 - [Config](#config)
 - [Maintainer's guide](#maintainers-guide)
+- [Credits](#credits)
 
 ## Installation
 
@@ -99,3 +102,7 @@ projects:
   git push && git push --tags
   ```
     - Our release workflow will then create a GitHub release with the pushed tag's changelog entry
+
+## Credits
+
+- [Robert "TheChirurgeon" Jones](https://www.tabletopbattles.com/author/thechirurgeon/) for the logo
