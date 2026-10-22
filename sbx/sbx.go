@@ -20,9 +20,9 @@ type Setting string
 
 // https://docs.docker.com/ai/sandboxes/configuration/settings/
 const (
-	SettingSshAgentForwardingEnabled Setting = "ssh.agentForwardingEnabled"
-	SettingSkillsDefaultMode                 = "skills.defaultMode"
-	SettingDiagnosticsAutoUpload             = "diagnostics.autoUpload"
+	SettingSSHAgentForwardingEnabled Setting = "ssh.agentForwardingEnabled"
+	SettingSkillsDefaultMode         Setting = "skills.defaultMode"
+	SettingDiagnosticsAutoUpload     Setting = "diagnostics.autoUpload"
 )
 
 func SetSetting(ctx context.Context, setting Setting, value string) error {
@@ -31,6 +31,10 @@ func SetSetting(ctx context.Context, setting Setting, value string) error {
 
 func RestartDaemon(ctx context.Context) error {
 	return sbx(ctx, "daemon", "restart")
+}
+
+func TerminalUI(ctx context.Context) error {
+	return sbx(ctx, "tui")
 }
 
 func sbx(ctx context.Context, args ...string) error {
