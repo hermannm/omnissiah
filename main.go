@@ -43,6 +43,13 @@ func main() {
 				},
 			},
 			{
+				Name:  "empower",
+				Usage: "Authenticate STC (AI model) providers",
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					return empower(ctx)
+				},
+			},
+			{
 				Name:    "pray",
 				Aliases: []string{"p"},
 				Usage:   "Start a new Omnissiah session in the current Git repo",
@@ -127,6 +134,96 @@ func awaken(ctx context.Context) error {
 	return nil
 }
 
+func empower(ctx context.Context) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return wrap.Error(err, "failed to load Omnissiah config")
+	}
+
+	var stcs []string
+	if cfg.DefaultSTC != "" {
+		stcs = append(stcs, cfg.DefaultSTC)
+	}
+	for _, project := range cfg.Projects {
+		if project.STC != "" && !slices.Contains(stcs, project.STC) {
+			stcs = append(stcs, project.STC)
+		}
+	}
+
+	// See "Available services" here: https://docs.docker.com/reference/cli/sbx/secret/set/
+	stcProviderMap := map[string]string{
+		config.STCClaude:  "anthropic",
+		config.STCCodex:   "openai",
+		config.STCCopilot: "github",
+		config.STCGemini:  "google",
+	}
+STCLoop:
+	for _, stc := range stcs {
+		provider, ok := stcProviderMap[stc]
+		if !ok {
+			slog.ErrorContext(
+				ctx,
+				fmt.Sprintf(
+					"No provider configured for STC '%s', please configure sbx directly",
+					stc,
+				),
+				"sbxDocs", "https://docs.docker.com/reference/cli/sbx/secret/set/",
+			)
+			continue
+		}
+
+		slog.InfoContext(
+			ctx,
+			fmt.Sprintf(
+				"Loading STC %s... (discovered by the tech priests of %s)",
+				color.Red.On(stc), color.Red.On(provider),
+			),
+		)
+
+		if stc == config.STCClaude {
+			fmt.Print(
+				`
+  If you have a Claude subscription, you can instead run /login on your first prayer.
+  This stores a session token on your host. Read sbx docs for more:
+  https://docs.docker.com/ai/sandboxes/get-started/#authenticate-your-agent
+
+  Do you still want to set an API token? (y/n) `,
+			)
+			yes, err := promptUserYesOrNo()
+			if err != nil {
+				return wrap.Error(err, "yes/no prompt failed")
+			}
+			if !yes {
+				fmt.Println() // Newline for spacing
+				continue STCLoop
+			}
+		}
+
+		if err := sbx.SetSecret(ctx, provider); err != nil {
+			return wrap.Errorf(err, "failed to set secret for STC provider '%s'", provider)
+		}
+	}
+
+	slog.InfoContext(ctx, fmt.Sprintf("Loaded all STCs configured in %s", cfg.Path.Short))
+	return nil
+}
+
+func promptUserYesOrNo() (yes bool, err error) {
+	var answer string
+	if _, err := fmt.Scanf("%s", &answer); err != nil {
+		return false, wrap.Error(err, "failed to scan user input")
+	}
+
+	switch answer {
+	case "y", "Y", "yes", "Yes", "YES":
+		return true, nil
+	case "n", "N", "no", "No", "NO":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid answer '%s'", answer)
+	}
+}
+
 type prayArgs struct {
 	Name string
 }
@@ -166,7 +263,7 @@ func pray(ctx context.Context, args prayArgs) error {
 		}
 	}
 
-	fmt.Printf("Waking machine spirit: %s\n", color.Red.On(args.Name)) //nolint:forbidigo
+	fmt.Printf("Waking machine spirit: %s\n", color.Red.On(args.Name))
 
 	if err := sbx.Run(ctx, args.Name, project.STC, project.Path); err != nil {
 		return err

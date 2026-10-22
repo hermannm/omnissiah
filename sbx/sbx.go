@@ -52,6 +52,10 @@ func Prune(ctx context.Context) error {
 	return sbx(ctx, "prune")
 }
 
+func SetSecret(ctx context.Context, provider string) error {
+	return sbx(ctx, "secret", "set", provider)
+}
+
 func List(ctx context.Context) ([]Sandbox, error) {
 	output, err := sbxOutput(ctx, "ls", "--json")
 	if err != nil {

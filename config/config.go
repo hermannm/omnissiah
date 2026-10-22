@@ -175,6 +175,16 @@ func getConfigPath(homedir string) Path {
 	}
 }
 
+// Known values for [Config.DefaultSTC].
+//
+// See "Available agents" at https://docs.docker.com/reference/cli/sbx/run/
+const (
+	STCClaude  = "claude"
+	STCCodex   = "codex"
+	STCCopilot = "copilot"
+	STCGemini  = "gemini"
+)
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return !errors.Is(err, fs.ErrNotExist)
