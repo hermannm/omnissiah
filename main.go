@@ -166,9 +166,9 @@ func pray(ctx context.Context, args prayArgs) error {
 		}
 	}
 
-	fmt.Printf("Praying to %v...\n", color.Red.On(args.Name)) //nolint:forbidigo
+	fmt.Printf("Waking machine spirit: %s\n", color.Red.On(args.Name)) //nolint:forbidigo
 
-	if err := sbx.Run(ctx, args.Name, project.Model, project.Path); err != nil {
+	if err := sbx.Run(ctx, args.Name, project.STC, project.Path); err != nil {
 		return err
 	}
 

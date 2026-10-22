@@ -16,13 +16,15 @@ import (
 )
 
 type Config struct {
-	DefaultModel string    `yaml:"defaultModel,omitempty"`
-	Projects     []Project `yaml:"projects"`
+	// STC = Standard Template Construct = AI model.
+	DefaultSTC string    `yaml:"defaultSTC,omitempty"`
+	Projects   []Project `yaml:"projects"`
 }
 
 type Project struct {
-	Path  string `yaml:"path"`
-	Model string `yaml:"model,omitempty"`
+	Path string `yaml:"path"`
+	// STC = Standard Template Construct = AI model.
+	STC string `yaml:"STC,omitempty"`
 }
 
 const configPath = "~/omnissiah.yml"
@@ -56,10 +58,10 @@ func Load() (cfg Config, returnedErr error) {
 	for i, project := range cfg.Projects {
 		cfg.Projects[i].Path = expandHomedir(project.Path, homedir)
 
-		if project.Model == "" && cfg.DefaultModel == "" {
+		if project.STC == "" && cfg.DefaultSTC == "" {
 			return Config{}, wrap.ErrorWithAttrs(
 				err,
-				"either 'defaultModel' or 'project.model' must be set in config",
+				"either `defaultSTC` or `project.STC` must be set in config",
 				"path", configPath,
 			)
 		}
@@ -87,8 +89,8 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		)
 	}
 
-	if project.Model == "" {
-		project.Model = cfg.DefaultModel
+	if project.STC == "" {
+		project.STC = cfg.DefaultSTC
 	}
 
 	return project, nil
@@ -120,8 +122,8 @@ func Initialize() (returnErr error) {
 	defer errclose.Close(encoder, &returnErr, "YAML encoder")
 
 	startingConfig := Config{
-		DefaultModel: "claude",
-		Projects:     []Project{{Path: "~/example", Model: ""}},
+		DefaultSTC: "claude",
+		Projects:   []Project{{Path: "~/example", STC: ""}},
 	}
 
 	if err := encoder.Encode(startingConfig); err != nil {
