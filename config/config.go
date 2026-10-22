@@ -6,12 +6,13 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 	"hermannm.dev/errclose"
 	"hermannm.dev/wrap"
+
+	"hermannm.dev/omnissiah/utils"
 )
 
 type Config struct {
@@ -73,19 +74,18 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		return Project{}, wrap.Error(err, "failed to get current directory")
 	}
 
-	i := slices.IndexFunc(
+	project, ok := utils.Find(
 		cfg.Projects,
 		func(p Project) bool {
 			return strings.HasPrefix(path, p.Path)
 		},
 	)
-	if i < 0 {
+	if !ok {
 		return Project{}, fmt.Errorf(
 			"'%s' is not a configured project path in %s",
 			path, configPath,
 		)
 	}
-	project := cfg.Projects[i]
 
 	if project.Model == "" {
 		project.Model = cfg.DefaultModel
