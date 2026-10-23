@@ -23,6 +23,10 @@ type Config struct {
 	// Omitted from YAML, since we set this ourselves.
 	//exhaustruct:optional
 	Path Path `yaml:"-"`
+	// We include the user's home directory in the config struct after parsing, so that we don't
+	// have to call [os.UserHomeDir] again later.
+	//exhaustruct:optional
+	Homedir string `yaml:"-"`
 }
 
 type Project struct {
@@ -56,6 +60,7 @@ func Load() (cfg Config, returnedErr error) {
 		)
 	}
 	cfg.Path = configPath
+	cfg.Homedir = homedir
 
 	// Expand uses of ~ in project paths
 	for i, project := range cfg.Projects {
@@ -76,7 +81,7 @@ func Load() (cfg Config, returnedErr error) {
 func (cfg Config) GetCurrentProject() (Project, error) {
 	path, err := os.Getwd()
 	if err != nil {
-		return Project{}, wrap.Error(err, "failed to get current directory")
+		return Project{}, wrap.Error(err, "failed to get current directory to determine project")
 	}
 
 	project, ok := sliceutil.Find(
@@ -88,7 +93,7 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 	if !ok {
 		return Project{}, fmt.Errorf(
 			"'%s' is not a configured project path in %s",
-			path, cfg.Path.Short,
+			collapseHomedir(path, cfg.Homedir), cfg.Path.Short,
 		)
 	}
 

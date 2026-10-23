@@ -236,7 +236,7 @@ func pray(ctx context.Context, args prayArgs) error {
 
 	project, err := cfg.GetCurrentProject()
 	if err != nil {
-		return wrap.Error(err, "failed to get current project")
+		return err
 	}
 
 	existingSpirits, err := sbx.List(ctx)
