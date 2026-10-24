@@ -6,7 +6,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.14.0
-	hermannm.dev/devlog v0.7.0
+	hermannm.dev/devlog v0.7.1
 	hermannm.dev/errclose v0.1.1
 	hermannm.dev/wrap v0.5.0
 )
