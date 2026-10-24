@@ -141,12 +141,12 @@ func empower(ctx context.Context) error {
 	}
 
 	var stcs []string
-	if cfg.DefaultSTC != "" {
-		stcs = append(stcs, cfg.DefaultSTC)
+	if cfg.DefaultSTC != nil {
+		stcs = append(stcs, cfg.DefaultSTC.Model)
 	}
 	for _, project := range cfg.Projects {
-		if project.STC != "" && !slices.Contains(stcs, project.STC) {
-			stcs = append(stcs, project.STC)
+		if project.STC != nil && !slices.Contains(stcs, project.STC.Model) {
+			stcs = append(stcs, project.STC.Model)
 		}
 	}
 
@@ -265,7 +265,13 @@ func pray(ctx context.Context, args prayArgs) error {
 
 	fmt.Printf("Waking machine spirit: %s\n", color.Red.On(args.Name))
 
-	if err := sbx.Run(ctx, args.Name, project.STC, project.Path); err != nil {
+	if err := sbx.Run(
+		ctx,
+		args.Name,
+		project.STC.Model,
+		project.Path,
+		project.STC.Args,
+	); err != nil {
 		return err
 	}
 

@@ -13,9 +13,8 @@ import (
 	"hermannm.dev/wrap"
 )
 
-func Run(ctx context.Context, name string, model string, path string) error {
-	return sbx(
-		ctx,
+func Run(ctx context.Context, name string, model string, path string, agentArgs []string) error {
+	sbxArgs := []string{
 		"run",
 		// Always run in clone mode, so the agent doesn't edit our own files:
 		// https://docs.docker.com/ai/sandboxes/usage/#clone-mode
@@ -24,7 +23,14 @@ func Run(ctx context.Context, name string, model string, path string) error {
 		name,
 		model,
 		path,
-	)
+	}
+	if len(agentArgs) != 0 {
+		// sbx docs: "Pass agent arguments after the "--" separator"
+		// https://docs.docker.com/reference/cli/sbx/run/
+		sbxArgs = append(sbxArgs, "--")
+		sbxArgs = append(sbxArgs, agentArgs...)
+	}
+	return sbx(ctx, sbxArgs...)
 }
 
 type Setting string

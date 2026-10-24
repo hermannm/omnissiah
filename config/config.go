@@ -17,8 +17,7 @@ import (
 )
 
 type Config struct {
-	// STC = Standard Template Construct = AI model.
-	DefaultSTC string    `yaml:"defaultSTC,omitempty"`
+	DefaultSTC *STC      `yaml:"defaultSTC,omitempty"`
 	Projects   []Project `yaml:"projects"`
 	// Omitted from YAML, since we set this ourselves.
 	//exhaustruct:optional
@@ -31,8 +30,13 @@ type Config struct {
 
 type Project struct {
 	Path string `yaml:"path"`
-	// STC = Standard Template Construct = AI model.
-	STC string `yaml:"STC,omitempty"`
+	STC  *STC   `yaml:"STC,omitempty"`
+}
+
+// STC = Standard Template Construct = AI model.
+type STC struct {
+	Model string   `yaml:"model"`
+	Args  []string `yaml:"args,omitempty"`
 }
 
 func Load() (cfg Config, returnedErr error) {
@@ -66,7 +70,7 @@ func Load() (cfg Config, returnedErr error) {
 	for i, project := range cfg.Projects {
 		cfg.Projects[i].Path = expandHomedir(project.Path, homedir)
 
-		if project.STC == "" && cfg.DefaultSTC == "" {
+		if project.STC == nil && cfg.DefaultSTC == nil {
 			return Config{}, wrap.ErrorWithAttrs(
 				err,
 				"either `defaultSTC` or `project.STC` must be set in config",
@@ -97,7 +101,7 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		)
 	}
 
-	if project.STC == "" {
+	if project.STC == nil {
 		project.STC = cfg.DefaultSTC
 	}
 
@@ -139,8 +143,16 @@ func Initialize() (returnErr error) {
 	defer errclose.Close(encoder, &returnErr, "YAML encoder")
 
 	startingConfig := Config{
-		DefaultSTC: "claude",
-		Projects:   []Project{{Path: filepath.Join("~", "example"), STC: ""}},
+		DefaultSTC: new(
+			STC{
+				Model: "claude",
+				Args:  []string{"--model=opus"},
+			},
+		),
+		Projects: []Project{{
+			Path: filepath.Join("~", "example"),
+			STC:  nil,
+		}},
 	}
 
 	if err := encoder.Encode(startingConfig); err != nil {
@@ -180,7 +192,7 @@ func getConfigPath(homedir string) Path {
 	}
 }
 
-// Known values for [Config.DefaultSTC].
+// Known values for [STC.Model].
 //
 // See "Available agents" at https://docs.docker.com/reference/cli/sbx/run/
 const (
