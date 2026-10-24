@@ -20,8 +20,7 @@ var (
 	Magenta = Color("\x1b[35m")
 	Cyan    = Color("\x1b[36m")
 	Gray    = Color("\x1b[37m")
-
-	reset = Color("\x1b[0m")
+	Reset   = Color("\x1b[0m")
 )
 
 // On applies the given color on the given string, if stdout supports ANSI colors.
@@ -29,7 +28,7 @@ func (c Color) On(s string) string {
 	if !supportsColor() {
 		return s
 	}
-	return string(c) + s + string(reset)
+	return string(c) + s + string(Reset)
 }
 
 // Caches result of [devlog.IsColorTerminal].

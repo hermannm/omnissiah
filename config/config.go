@@ -68,7 +68,7 @@ func Load() (cfg Config, returnedErr error) {
 
 	// Expand uses of ~ in project paths
 	for i, project := range cfg.Projects {
-		cfg.Projects[i].Path = expandHomedir(project.Path, homedir)
+		cfg.Projects[i].Path = ExpandHomedir(project.Path, homedir)
 
 		if project.STC == nil && cfg.DefaultSTC == nil {
 			return Config{}, wrap.ErrorWithAttrs(
@@ -97,7 +97,7 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 	if !ok {
 		return Project{}, fmt.Errorf(
 			"'%s' is not a configured project path in %s",
-			collapseHomedir(path, cfg.Homedir), cfg.Path.Short,
+			CollapseHomedir(path, cfg.Homedir), cfg.Path.Short,
 		)
 	}
 
@@ -181,13 +181,13 @@ func getConfigPath(homedir string) Path {
 	} else {
 		// If XDG_CONFIG_HOME is set, collapse home dir in path to ~, so we can return both variants
 		// below
-		configHome = collapseHomedir(configHome, homedir)
+		configHome = CollapseHomedir(configHome, homedir)
 	}
 
 	path := filepath.Join(configHome, "omnissiah", "config.yml")
 
 	return Path{
-		Absolute: expandHomedir(path, homedir),
+		Absolute: ExpandHomedir(path, homedir),
 		Short:    path,
 	}
 }
@@ -207,10 +207,10 @@ func fileExists(path string) bool {
 	return !errors.Is(err, fs.ErrNotExist)
 }
 
-func expandHomedir(path string, homedir string) (expandedPath string) {
+func ExpandHomedir(path string, homedir string) (expandedPath string) {
 	return strings.Replace(path, "~", homedir, 1)
 }
 
-func collapseHomedir(path string, homedir string) (collapsedPath string) {
+func CollapseHomedir(path string, homedir string) (collapsedPath string) {
 	return strings.Replace(path, homedir, "~", 1)
 }

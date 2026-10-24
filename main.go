@@ -15,10 +15,10 @@ import (
 	"hermannm.dev/devlog/sloginit"
 	"hermannm.dev/wrap"
 
-	"hermannm.dev/omnissiah/internal/color"
-
 	"hermannm.dev/omnissiah/config"
+	"hermannm.dev/omnissiah/internal/color"
 	"hermannm.dev/omnissiah/sbx"
+	"hermannm.dev/omnissiah/tui"
 )
 
 func main() {
@@ -63,6 +63,14 @@ func main() {
 				},
 				Action: func(ctx context.Context, _ *cli.Command) error {
 					return pray(ctx, prayArgs)
+				},
+			},
+			{
+				Name:    "commune",
+				Aliases: []string{"c"},
+				Usage:   "Commune with existing machine spirits",
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					return commune(ctx)
 				},
 			},
 			{
@@ -324,6 +332,59 @@ var machineSpiritNames = []string{
 	"tox",
 	"vox",
 	"zyx",
+}
+
+func commune(ctx context.Context) error {
+	machineSpirits, err := sbx.List(ctx)
+	if err != nil {
+		return wrap.Error(err, "failed to list machine spirits")
+	}
+
+	sortSpirits(machineSpirits, sortArgs{runningFirst: true, newestFirst: false})
+
+	if err := tui.RenderMachineSpiritPicker(machineSpirits); err != nil {
+		return wrap.Error(err, "machine spirit picker failed")
+	}
+	return nil
+}
+
+type sortArgs struct {
+	runningFirst bool
+	newestFirst  bool
+}
+
+func sortSpirits(machineSpirits []sbx.Sandbox, args sortArgs) {
+	slices.SortFunc(
+		machineSpirits,
+		func(s1 sbx.Sandbox, s2 sbx.Sandbox) int {
+			// Sort by status first
+			if s1.Status != s2.Status {
+				if s1.Status == sbx.StatusRunning {
+					if args.runningFirst {
+						return -1
+					} else {
+						return 1
+					}
+				}
+				if s2.Status == sbx.StatusRunning {
+					if args.runningFirst {
+						return 1
+					} else {
+						return -1
+					}
+				}
+			}
+
+			// Then sort by created time
+			createdAtCmp := s1.CreatedAt.Compare(s2.CreatedAt)
+			// Sort is ascending, so we have to invert it to get newest first
+			if args.newestFirst {
+				return -createdAtCmp
+			} else {
+				return createdAtCmp
+			}
+		},
+	)
 }
 
 func cortex(ctx context.Context) error {
