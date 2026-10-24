@@ -197,7 +197,7 @@ STCLoop:
 
   Do you still want to set an API token? (y/n) `,
 			)
-			yes, err := promptUserYesOrNo()
+			yes, err := tui.PromptUserYesOrNo()
 			if err != nil {
 				return wrap.Error(err, "yes/no prompt failed")
 			}
@@ -214,22 +214,6 @@ STCLoop:
 
 	slog.InfoContext(ctx, fmt.Sprintf("Loaded all STCs configured in %s", cfg.Path.Short))
 	return nil
-}
-
-func promptUserYesOrNo() (yes bool, err error) {
-	var answer string
-	if _, err := fmt.Scanf("%s", &answer); err != nil {
-		return false, wrap.Error(err, "failed to scan user input")
-	}
-
-	switch answer {
-	case "y", "Y", "yes", "Yes", "YES":
-		return true, nil
-	case "n", "N", "no", "No", "NO":
-		return false, nil
-	default:
-		return false, fmt.Errorf("invalid answer '%s'", answer)
-	}
 }
 
 type prayArgs struct {
