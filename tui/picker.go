@@ -11,7 +11,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
-	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"hermannm.dev/wrap"
@@ -122,8 +121,6 @@ func initPickerModel(
 	m.list.KeyMap.CursorDown.SetHelp("↓", "down")
 	m.list.DisableQuitKeybindings()
 
-	m.list.SetSpinner(spinner.Globe)
-
 	m.list.Styles.Title = m.list.Styles.Title.Foreground(colorBlack).Background(colorBlue)
 	m.list.Styles.StatusBar = m.list.Styles.StatusBar.Foreground(colorGray)
 	m.list.Styles.StatusEmpty = m.list.Styles.StatusEmpty.Foreground(colorGray)
@@ -220,9 +217,8 @@ func (m *pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-		// Clear background action title and spinner, now that it's finished
+		// Clear background action title, now that it's finished
 		item.BackgroundAction = ""
-		m.list.StopSpinner()
 
 		if err != nil {
 			if errors.Is(err, ErrRemovePickerItem) {
@@ -265,7 +261,6 @@ func (m *pickerModel) executeAction(action PickerAction, confirmed bool) tea.Cmd
 		)
 
 		return tea.Batch(
-			m.list.StartSpinner(),
 			// Pattern for asynchronous messages in Bubbletea:
 			// https://github.com/charmbracelet/bubbletea/discussions/305#discussioncomment-2650714
 			executeBackgroundAction(m.ctx, action, selected.Spirit, m.backgroundActionChan),
@@ -367,6 +362,7 @@ type PickerItem struct {
 	Age              string
 	PrimaryWorkspace string // Optional.
 	Info             string
+	// Nil if not currently confirming an action.
 	ConfirmingAction *ConfirmingAction
 	// Blank if not currently running a background action.
 	BackgroundAction string
@@ -402,6 +398,7 @@ func makePickerItem(spirit sbx.Sandbox, now time.Time, homedir string) *PickerIt
 		PrimaryWorkspace: primaryWorkspace,
 		Info:             makePickerItemInfo(spirit, primaryWorkspace, age),
 		ConfirmingAction: nil,
+		BackgroundAction: "",
 	}
 }
 
