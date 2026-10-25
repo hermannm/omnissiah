@@ -1,54 +1,51 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"hermannm.dev/wrap"
 
 	"hermannm.dev/omnissiah/config"
+
 	"hermannm.dev/omnissiah/internal/sliceutil"
 	"hermannm.dev/omnissiah/sbx"
 )
 
-func RenderMachineSpiritPicker(machineSpirits []sbx.Sandbox) error {
-	homedir, err := os.UserHomeDir()
+type PickerAction struct {
+	Name         string
+	Key          string
+	Asynchronous bool
+	// Set this to show a Yes/No confirmation before performing the Action.
+	// Returns a list of strings for multiple lines.
+	//exhaustruct:optional
+	Confirmation func(item PickerItem) []string
+	Action       func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error)
+}
+
+func RenderMachineSpiritPicker(
+	ctx context.Context,
+	machineSpirits []sbx.Sandbox,
+	actions []PickerAction,
+	defaultAction string,
+) error {
+	items, err := initPickerItems(machineSpirits)
 	if err != nil {
-		return wrap.Error(err, "failed to get user home dir")
+		return wrap.Error(err, "failed to initialize picker items")
 	}
 
-	now := time.Now()
-	items := sliceutil.Map(
-		machineSpirits,
-		func(spirit sbx.Sandbox) list.Item {
-			return pickerItem{
-				spirit: spirit,
-				info:   makePickerItemInfo(spirit, homedir, now),
-			}
-		},
-	)
+	itemDelegate := initPickerItemDelegate(actions, defaultAction)
 
-	itemDelegate := list.NewDefaultDelegate()
-	itemDelegate.Styles.SelectedTitle = itemDelegate.Styles.SelectedTitle.
-		Foreground(ansiColorRed).
-		BorderLeftForeground(ansiColorRed)
-	itemDelegate.Styles.SelectedDesc = itemDelegate.Styles.SelectedDesc.
-		Foreground(ansiColorRed).
-		BorderLeftForeground(ansiColorRed)
+	model := initPickerModel(ctx, items, itemDelegate)
 
-	model := pickerModel{list: list.New(items, itemDelegate, 0, 0)}
-	model.list.Title = "Machine spirits"
-	model.list.SetStatusBarItemName("spirit", "spirits")
-	model.list.Styles.Title = model.list.Styles.Title.
-		Foreground(ansiColorBlack).
-		Background(ansiColorBlue)
-
-	_, err = tea.NewProgram(model).Run()
+	_, err = tea.NewProgram(model, tea.WithContext(ctx)).Run()
 	if err != nil {
 		return err
 	}
@@ -57,7 +54,34 @@ func RenderMachineSpiritPicker(machineSpirits []sbx.Sandbox) error {
 }
 
 type pickerModel struct {
+	ctx  context.Context
 	list list.Model
+}
+
+func initPickerModel(
+	ctx context.Context,
+	items []list.Item,
+	itemDelegate list.ItemDelegate,
+) pickerModel {
+	model := pickerModel{
+		ctx:  ctx,
+		list: list.New(items, itemDelegate, 0, 0),
+	}
+
+	model.list.Title = "Machine spirits"
+	model.list.SetStatusBarItemName("spirit", "spirits")
+
+	model.list.Styles.Title = model.list.Styles.Title.
+		Foreground(ansiColorBlack).
+		Background(ansiColorBlue)
+
+	model.list.KeyMap.CursorUp.SetKeys("up")
+	model.list.KeyMap.CursorUp.SetHelp("↑", "up")
+	model.list.KeyMap.CursorDown.SetKeys("down")
+	model.list.KeyMap.CursorDown.SetHelp("↓", "down")
+	model.list.DisableQuitKeybindings()
+
+	return model
 }
 
 func (m pickerModel) Init() tea.Cmd {
@@ -76,10 +100,16 @@ var (
 func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		key := msg.String()
-		if key == "ctrl+c" ||
-			// Esc is used to quit filter menu, so we don't want to override that
-			(key == "esc" && m.list.FilterState() != list.Filtering) {
+		pressedKey := msg.String()
+		if pressedKey == "ctrl+c" {
+			return m, tea.Quit
+		}
+
+		if m.list.FilterState() == list.Filtering {
+			break
+		}
+
+		if pressedKey == "esc" {
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
@@ -98,32 +128,50 @@ func (m pickerModel) View() tea.View {
 	return v
 }
 
-type pickerItem struct {
-	spirit sbx.Sandbox
-	info   string
+type PickerItem struct {
+	Spirit           sbx.Sandbox
+	Age              string
+	PrimaryWorkspace string // Optional.
+	Info             string
 }
 
-func (i pickerItem) Title() string {
-	return i.spirit.Name
+func initPickerItems(spirits []sbx.Sandbox) ([]list.Item, error) {
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, wrap.Error(err, "failed to get user home dir")
+	}
+
+	now := time.Now()
+
+	items := sliceutil.Map(
+		spirits,
+		func(spirit sbx.Sandbox) list.Item {
+			age := formatAge(spirit, now)
+
+			var primaryWorkspace string
+			if len(spirit.Workspaces) != 0 {
+				primaryWorkspace = config.CollapseHomedir(spirit.Workspaces[0], homedir)
+			}
+
+			return PickerItem{
+				Spirit:           spirit,
+				Age:              age,
+				PrimaryWorkspace: primaryWorkspace,
+				Info:             makePickerItemInfo(spirit, primaryWorkspace, age),
+			}
+		},
+	)
+	return items, nil
 }
 
-func (i pickerItem) Description() string {
-	return i.info
-}
-
-func (i pickerItem) FilterValue() string {
-	return i.spirit.Name
-}
-
-func makePickerItemInfo(spirit sbx.Sandbox, homedir string, now time.Time) string {
+func makePickerItemInfo(spirit sbx.Sandbox, primaryWorkspace string, age string) string {
 	var builder strings.Builder
 
-	builder.WriteString(formatAge(spirit, now))
+	builder.WriteString(age)
 
-	if len(spirit.Workspaces) != 0 {
+	if primaryWorkspace != "" {
 		builder.WriteString(" • ")
-		primaryWorkspace := spirit.Workspaces[0]
-		builder.WriteString(config.CollapseHomedir(primaryWorkspace, homedir))
+		builder.WriteString(primaryWorkspace)
 	}
 
 	builder.WriteString(" • ")
@@ -152,4 +200,50 @@ func formatAge(spirit sbx.Sandbox, now time.Time) string {
 
 	minutes := int64(age.Minutes())
 	return fmt.Sprintf("%dm", minutes)
+}
+
+func (i PickerItem) Title() string {
+	return i.Spirit.Name
+}
+
+func (i PickerItem) Description() string {
+	return i.Info
+}
+
+func (i PickerItem) FilterValue() string {
+	return i.Spirit.Name
+}
+
+func initPickerItemDelegate(actions []PickerAction, defaultAction string) list.ItemDelegate {
+	delegate := list.NewDefaultDelegate()
+
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
+		Foreground(ansiColorRed).
+		BorderLeftForeground(ansiColorRed)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedTitle
+
+	keyBindings := sliceutil.Map(
+		actions,
+		func(action PickerAction) key.Binding {
+			if action.Name == defaultAction {
+				return key.NewBinding(
+					key.WithKeys(action.Key, "enter"),
+					key.WithHelp(action.Key+"/enter", action.Name),
+				)
+			} else {
+				return key.NewBinding(
+					key.WithKeys(action.Key),
+					key.WithHelp(action.Key, action.Name),
+				)
+			}
+		},
+	)
+	delegate.ShortHelpFunc = func() []key.Binding {
+		return keyBindings
+	}
+	delegate.FullHelpFunc = func() [][]key.Binding {
+		return [][]key.Binding{keyBindings}
+	}
+
+	return delegate
 }

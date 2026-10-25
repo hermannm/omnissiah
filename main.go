@@ -326,11 +326,69 @@ func commune(ctx context.Context) error {
 
 	sortSpirits(machineSpirits, sortArgs{runningFirst: true, newestFirst: true})
 
-	if err := tui.RenderMachineSpiritPicker(machineSpirits); err != nil {
+	if err := tui.RenderMachineSpiritPicker(
+		ctx,
+		machineSpirits,
+		[]tui.PickerAction{
+			pickerActionCommune,
+			pickerActionWake,
+			pickerActionSleep,
+			pickerActionKill,
+		},
+		pickerActionCommune.Name,
+	); err != nil {
 		return wrap.Error(err, "machine spirit picker failed")
 	}
 	return nil
 }
+
+var (
+	pickerActionCommune = tui.PickerAction{
+		Name: "commune",
+		Key:  "c",
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
+			spirit.Status = sbx.StatusRunning
+			return &spirit, nil
+		},
+		Asynchronous: false,
+	}
+	pickerActionWake = tui.PickerAction{
+		Name: "wake",
+		Key:  "w",
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
+			spirit.Status = sbx.StatusRunning
+			return &spirit, nil
+		},
+		Asynchronous: true,
+	}
+	pickerActionSleep = tui.PickerAction{
+		Name: "sleep",
+		Key:  "s",
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
+			spirit.Status = sbx.StatusStopped
+			return &spirit, nil
+		},
+		Asynchronous: true,
+	}
+	pickerActionKill = tui.PickerAction{
+		Name:         "kill",
+		Key:          "k",
+		Asynchronous: true,
+		Confirmation: func(item tui.PickerItem) []string {
+			firstLine := fmt.Sprintf("Kill machine spirit %s?", color.Red.On(item.Spirit.Name))
+			secondLine := item.Age
+			if item.PrimaryWorkspace != "" {
+				secondLine += " • "
+				secondLine += item.PrimaryWorkspace
+			}
+			return []string{firstLine, color.Gray.On(secondLine)}
+		},
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
+			//nolint:nilnil // Return nil spirit to remove it from the list
+			return nil, nil
+		},
+	}
+)
 
 type sortArgs struct {
 	runningFirst bool
