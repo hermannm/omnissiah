@@ -346,24 +346,24 @@ var (
 		Name:       "commune",
 		Key:        "c",
 		Background: false,
-		Action: func(ctx context.Context, spirit *sbx.Sandbox) error {
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
 			if err := sbx.RunExisting(ctx, spirit.Name); err != nil {
-				return err
+				return sbx.Sandbox{}, err
 			}
 			spirit.Status = sbx.StatusRunning
-			return nil
+			return spirit, nil
 		},
 	}
 	pickerActionSleep = tui.PickerAction{
 		Name:       "sleep",
 		Key:        "s",
 		Background: true,
-		Action: func(ctx context.Context, spirit *sbx.Sandbox) error {
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
 			if err := sbx.Stop(ctx, spirit.Name); err != nil {
-				return err
+				return sbx.Sandbox{}, err
 			}
 			spirit.Status = sbx.StatusStopped
-			return nil
+			return spirit, nil
 		},
 	}
 	pickerActionKill = tui.PickerAction{
@@ -371,11 +371,11 @@ var (
 		Key:                 "k",
 		Background:          true,
 		RequireConfirmation: true,
-		Action: func(ctx context.Context, spirit *sbx.Sandbox) error {
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
 			if err := sbx.Remove(ctx, spirit.Name, true); err != nil {
-				return err
+				return sbx.Sandbox{}, err
 			}
-			return tui.ErrRemovePickerItem
+			return spirit, tui.ErrRemovePickerItem
 		},
 	}
 )

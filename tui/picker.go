@@ -43,7 +43,7 @@ func RenderMachineSpiritPicker(
 	}
 
 	if model.selectedSpirit != nil && model.selectedAction != nil {
-		if err := model.selectedAction.Action(ctx, model.selectedSpirit); err != nil {
+		if _, err := model.selectedAction.Action(ctx, *model.selectedSpirit); err != nil {
 			return wrap.Errorf(err, "%s failed", model.selectedSpirit.Name)
 		}
 	}
@@ -57,7 +57,7 @@ type PickerAction struct {
 	Background          bool
 	RequireConfirmation bool //exhaustruct:optional
 	// Return [ErrRemovePickerItem] to remove the item from the picker after the action.
-	Action func(ctx context.Context, spirit *sbx.Sandbox) error
+	Action func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error)
 }
 
 var ErrRemovePickerItem = errors.New("remove picker item")
@@ -68,8 +68,8 @@ type pickerModel struct {
 	list           list.Model
 	actions        []PickerAction
 	defaultAction  string
-	selectedSpirit *sbx.Sandbox
-	selectedAction *PickerAction
+	selectedSpirit *sbx.Sandbox  // Optional.
+	selectedAction *PickerAction // Optional.
 }
 
 func initPickerModel(
@@ -203,7 +203,7 @@ func (m *pickerModel) executeAction(action PickerAction, confirmed bool) tea.Cmd
 		return nil
 	} else {
 		m.selectedAction = &action
-		m.selectedSpirit = selectedItem.Spirit
+		m.selectedSpirit = &selectedItem.Spirit
 		return tea.Quit
 	}
 }
@@ -229,7 +229,7 @@ func (m *pickerModel) View() tea.View {
 }
 
 type PickerItem struct {
-	Spirit           *sbx.Sandbox
+	Spirit           sbx.Sandbox
 	Age              string
 	PrimaryWorkspace string // Optional.
 	Info             string
@@ -260,7 +260,7 @@ func initPickerItems(spirits []sbx.Sandbox) ([]list.Item, error) {
 			}
 
 			return &PickerItem{
-				Spirit:           &spirit,
+				Spirit:           spirit,
 				Age:              age,
 				PrimaryWorkspace: primaryWorkspace,
 				Info:             makePickerItemInfo(spirit, primaryWorkspace, age),
