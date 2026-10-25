@@ -33,9 +33,20 @@ func RenderMachineSpiritPicker(machineSpirits []sbx.Sandbox) error {
 		},
 	)
 
-	model := pickerModel{list: list.New(items, list.NewDefaultDelegate(), 0, 0)}
+	itemDelegate := list.NewDefaultDelegate()
+	itemDelegate.Styles.SelectedTitle = itemDelegate.Styles.SelectedTitle.
+		Foreground(ansiColorRed).
+		BorderLeftForeground(ansiColorRed)
+	itemDelegate.Styles.SelectedDesc = itemDelegate.Styles.SelectedDesc.
+		Foreground(ansiColorRed).
+		BorderLeftForeground(ansiColorRed)
+
+	model := pickerModel{list: list.New(items, itemDelegate, 0, 0)}
 	model.list.Title = "Machine spirits"
 	model.list.SetStatusBarItemName("spirit", "spirits")
+	model.list.Styles.Title = model.list.Styles.Title.
+		Foreground(ansiColorBlack).
+		Background(ansiColorBlue)
 
 	_, err = tea.NewProgram(model).Run()
 	if err != nil {
@@ -55,12 +66,20 @@ func (m pickerModel) Init() tea.Cmd {
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
 
+// https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
+var (
+	ansiColorBlack = lipgloss.ANSIColor(0)
+	ansiColorRed   = lipgloss.ANSIColor(1)
+	ansiColorBlue  = lipgloss.ANSIColor(4)
+)
+
 func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		key := msg.String()
-		switch key {
-		case "ctrl+c", "esc":
+		if key == "ctrl+c" ||
+			// Esc is used to quit filter menu, so we don't want to override that
+			(key == "esc" && m.list.FilterState() != list.Filtering) {
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:

@@ -324,7 +324,7 @@ func commune(ctx context.Context) error {
 		return wrap.Error(err, "failed to list machine spirits")
 	}
 
-	sortSpirits(machineSpirits, sortArgs{runningFirst: true, newestFirst: false})
+	sortSpirits(machineSpirits, sortArgs{runningFirst: true, newestFirst: true})
 
 	if err := tui.RenderMachineSpiritPicker(machineSpirits); err != nil {
 		return wrap.Error(err, "machine spirit picker failed")
