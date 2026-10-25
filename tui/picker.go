@@ -11,6 +11,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"hermannm.dev/wrap"
@@ -58,12 +59,15 @@ func RenderMachineSpiritPicker(
 }
 
 type PickerAction struct {
-	Name                string
-	Key                 string
-	Background          bool
+	Name string
+	Key  string
+	// If this action should run in the background (i.e., not terminate the picker to perform the
+	// action): Set this to a string describing what is being done.
+	//exhaustruct:optional
+	Background          string
 	RequireConfirmation bool //exhaustruct:optional
-	// Return [ErrRemovePickerItem] (and the spirit) to remove the item from the picker after the
-	// action.
+	// Return updated machine spirit. Return [ErrRemovePickerItem] (and the spirit) to remove the
+	// item from the picker after the action.
 	Action func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error)
 }
 
@@ -112,13 +116,21 @@ func initPickerModel(
 	m.list.Title = "The Omnissiah"
 	m.list.SetStatusBarItemName("machine spirit", "machine spirits")
 
+	m.list.KeyMap.CursorUp.SetKeys("up")
+	m.list.KeyMap.CursorUp.SetHelp("↑", "up")
+	m.list.KeyMap.CursorDown.SetKeys("down")
+	m.list.KeyMap.CursorDown.SetHelp("↓", "down")
+	m.list.DisableQuitKeybindings()
+
+	m.list.SetSpinner(spinner.Globe)
+
 	m.list.Styles.Title = m.list.Styles.Title.Foreground(colorBlack).Background(colorBlue)
 	m.list.Styles.StatusBar = m.list.Styles.StatusBar.Foreground(colorGray)
 	m.list.Styles.StatusEmpty = m.list.Styles.StatusEmpty.Foreground(colorGray)
 	// Hide "No items" display, since it duplicates status bar
 	m.list.Styles.NoItems = m.list.Styles.NoItems.Foreground(colorBlack)
-	m.list.Styles.Spinner = m.list.Styles.Spinner.Foreground(colorRed)
 	m.list.Styles.StatusBarFilterCount = m.list.Styles.StatusBarFilterCount.Foreground(colorGray)
+	m.list.Styles.DividerDot = m.list.Styles.DividerDot.Foreground(colorGray)
 
 	m.list.Help.Styles.ShortKey = m.list.Help.Styles.ShortKey.Foreground(colorWhite)
 	m.list.Help.Styles.FullKey = m.list.Help.Styles.ShortKey
@@ -126,12 +138,6 @@ func initPickerModel(
 	m.list.Help.Styles.FullDesc = m.list.Help.Styles.ShortDesc
 	m.list.Help.Styles.ShortSeparator = m.list.Help.Styles.ShortDesc
 	m.list.Help.Styles.FullSeparator = m.list.Help.Styles.ShortSeparator
-
-	m.list.KeyMap.CursorUp.SetKeys("up")
-	m.list.KeyMap.CursorUp.SetHelp("↑", "up")
-	m.list.KeyMap.CursorDown.SetKeys("down")
-	m.list.KeyMap.CursorDown.SetHelp("↓", "down")
-	m.list.DisableQuitKeybindings()
 
 	return &m
 }
@@ -206,29 +212,29 @@ func (m *pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case backgroundActionResult:
-		m.list.StopSpinner()
+		spirit, err := msg.spirit, msg.err
 
-		if msg.err != nil {
-			if errors.Is(msg.err, ErrRemovePickerItem) {
-				for i, item := range m.items() {
-					if item.Spirit.Name == msg.spirit.Name {
-						m.list.RemoveItem(i)
-						break
-					}
-				}
-				return m, nil
-			}
-
-			m.err = msg.err
+		item, itemIndex, err2 := m.getItemBySpiritName(spirit.Name)
+		if item == nil {
+			m.err = err2
 			return m, tea.Quit
 		}
 
-		updatedSpirit := msg.spirit
-		for i, item := range m.items() {
-			if item.Spirit.Name == updatedSpirit.Name {
-				m.list.SetItem(i, makePickerItem(updatedSpirit, time.Now(), m.homedir))
+		// Clear background action title and spinner, now that it's finished
+		item.BackgroundAction = ""
+		m.list.StopSpinner()
+
+		if err != nil {
+			if errors.Is(err, ErrRemovePickerItem) {
+				m.list.RemoveItem(itemIndex)
+				return m, nil
 			}
+
+			m.err = err
+			return m, tea.Quit
 		}
+
+		m.list.SetItem(itemIndex, makePickerItem(spirit, time.Now(), m.homedir))
 		return m, nil
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
@@ -241,27 +247,33 @@ func (m *pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *pickerModel) executeAction(action PickerAction, confirmed bool) tea.Cmd {
-	selectedItem, ok := m.selectedItem()
+	selected, ok := m.selectedItem()
 	if !ok {
 		return nil
 	}
 
 	if action.RequireConfirmation && !confirmed {
-		selectedItem.setConfirmingAction(action)
+		selected.setConfirmingAction(action)
 		return nil
 	}
 
-	if action.Background {
+	if action.Background != "" {
+		selected.BackgroundAction = fmt.Sprintf(
+			"%s • %s",
+			selected.Spirit.Name,
+			color.Yellow.On(action.Background),
+		)
+
 		return tea.Batch(
 			m.list.StartSpinner(),
 			// Pattern for asynchronous messages in Bubbletea:
 			// https://github.com/charmbracelet/bubbletea/discussions/305#discussioncomment-2650714
-			executeBackgroundAction(m.ctx, action, selectedItem.Spirit, m.backgroundActionChan),
+			executeBackgroundAction(m.ctx, action, selected.Spirit, m.backgroundActionChan),
 			listenForBackgroundActionResult(m.ctx, m.backgroundActionChan),
 		)
 	} else {
 		m.selectedAction = &action
-		m.selectedSpirit = &selectedItem.Spirit
+		m.selectedSpirit = &selected.Spirit
 		return tea.Quit
 	}
 }
@@ -274,6 +286,11 @@ func executeBackgroundAction(
 ) tea.Cmd {
 	return func() tea.Msg {
 		updatedSpirit, err := action.Action(ctx, spirit)
+		// If action returned empty spirit, then we still want to send the original spirit back on
+		// the channel, as we use it for look-ups even in case of errors
+		if updatedSpirit.Name == "" {
+			updatedSpirit = spirit
+		}
 		select {
 		case resultChan <- backgroundActionResult{spirit: updatedSpirit, err: err}:
 			return nil
@@ -325,6 +342,20 @@ func (m *pickerModel) items() iter.Seq2[int, *PickerItem] {
 	}
 }
 
+func (m *pickerModel) getItemBySpiritName(name string) (item *PickerItem, index int, err error) {
+	for i, itemCandidate := range m.items() {
+		if itemCandidate.Spirit.Name == name {
+			item = itemCandidate
+			index = i
+			break
+		}
+	}
+	if item == nil {
+		return nil, 0, fmt.Errorf("no picker item found for machine spirit '%s'", name)
+	}
+	return item, index, nil
+}
+
 func (m *pickerModel) View() tea.View {
 	v := tea.NewView(docStyle.Render(m.list.View()))
 	v.AltScreen = true
@@ -337,6 +368,8 @@ type PickerItem struct {
 	PrimaryWorkspace string // Optional.
 	Info             string
 	ConfirmingAction *ConfirmingAction
+	// Blank if not currently running a background action.
+	BackgroundAction string
 }
 
 type ConfirmingAction struct {
@@ -444,6 +477,8 @@ func (i *PickerItem) clearConfirmation() {
 func (i *PickerItem) Title() string {
 	if i.ConfirmingAction != nil {
 		return i.ConfirmingAction.Prompt
+	} else if i.BackgroundAction != "" {
+		return i.BackgroundAction
 	} else {
 		return i.Spirit.Name
 	}

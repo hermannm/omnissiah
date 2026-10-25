@@ -354,9 +354,8 @@ func commune(ctx context.Context) error {
 
 var (
 	pickerActionCommune = tui.PickerAction{
-		Name:       "commune",
-		Key:        "c",
-		Background: false,
+		Name: "commune",
+		Key:  "c",
 		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
 			if err := sbx.RunExisting(ctx, spirit.Name); err != nil {
 				return sbx.Sandbox{}, err
@@ -368,7 +367,7 @@ var (
 	pickerActionWake = tui.PickerAction{
 		Name:       "wake",
 		Key:        "w",
-		Background: true,
+		Background: "Waking...",
 		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
 			if _, err := sbx.RunExistingDetached(ctx, spirit.Name); err != nil {
 				return sbx.Sandbox{}, err
@@ -380,7 +379,7 @@ var (
 	pickerActionSleep = tui.PickerAction{
 		Name:       "sleep",
 		Key:        "s",
-		Background: true,
+		Background: "Putting to sleep...",
 		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
 			if _, err := sbx.Stop(ctx, spirit.Name); err != nil {
 				return sbx.Sandbox{}, err
@@ -392,7 +391,7 @@ var (
 	pickerActionKill = tui.PickerAction{
 		Name:                "kill",
 		Key:                 "k",
-		Background:          true,
+		Background:          "Killing...",
 		RequireConfirmation: true,
 		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
 			if _, err := sbx.Remove(ctx, spirit.Name, true); err != nil {
