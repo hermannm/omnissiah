@@ -77,12 +77,12 @@ const (
 	SettingDiagnosticsAutoUpload     Setting = "diagnostics.autoUpload"
 )
 
-func SetSetting(ctx context.Context, setting Setting, value string) error {
-	return sbx(ctx, "settings", "set", string(setting), value)
+func SetSetting(ctx context.Context, setting Setting, value string) (stdout []byte, err error) {
+	return sbxOutput(ctx, "settings", "set", string(setting), value)
 }
 
-func RestartDaemon(ctx context.Context) error {
-	return sbx(ctx, "daemon", "restart")
+func RestartDaemon(ctx context.Context) (stdout []byte, err error) {
+	return sbxOutput(ctx, "daemon", "restart")
 }
 
 func TerminalUI(ctx context.Context) error {
@@ -164,7 +164,7 @@ func sbx(ctx context.Context, args ...string) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return wrap.Errorf(err, "'sbx %s' failed", strings.Join(args, " "))
+		return newError(err, args, true)
 	}
 	return nil
 }
@@ -174,11 +174,52 @@ func sbxOutput(ctx context.Context, args ...string) (stdout []byte, err error) {
 
 	stdout, err = cmd.Output()
 	if err != nil {
-		return nil, wrap.Errorf(err, "'sbx %s' failed", strings.Join(args, " "))
+		return nil, newError(err, args, false)
 	}
 	return stdout, nil
 }
 
-func AsExitError(err error) (*exec.ExitError, bool) {
-	return errors.AsType[*exec.ExitError](err)
+type Error struct {
+	args     []string
+	cause    error
+	ExitCode int
+	// True if sbx's output was forwarded to Omnissiah's stdout (we use this to determine whether
+	// we should log an error, or assume that sbx has done it for us).
+	OutputForwarded bool
+}
+
+func newError(cause error, args []string, outputForwarded bool) Error {
+	exitCode := 1
+	if exitErr, ok := errors.AsType[*exec.ExitError](cause); ok {
+		exitCode = exitErr.ExitCode()
+
+		stderr := string(exitErr.Stderr)
+		if len(stderr) != 0 {
+			if stderr[len(stderr)-1] == '\n' {
+				stderr = stderr[0 : len(stderr)-1]
+			}
+
+			// Replace "exit status 1" error with more useful stderr error
+			cause = errors.New(stderr)
+		}
+	}
+
+	return Error{
+		args:            args,
+		cause:           cause,
+		ExitCode:        exitCode,
+		OutputForwarded: outputForwarded,
+	}
+}
+
+func (err Error) Error() string {
+	return fmt.Sprintf("'sbx %s' failed: %v", strings.Join(err.args, " "), err.cause)
+}
+
+func (err Error) Unwrap() error {
+	return err.cause
+}
+
+func AsSBXError(err error) (sbxErr Error, ok bool) {
+	return errors.AsType[Error](err)
 }

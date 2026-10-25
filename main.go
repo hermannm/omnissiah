@@ -112,11 +112,14 @@ func main() {
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		// If sbx gave an exit error: use same exit code and don't log, as sbx likely already logged
-		// Otherwise: log the error and exit with code 1
-		exitErr, ok := sbx.AsExitError(err)
+		// If error came from sbx, we don't want to log if its output was already forwarded, as that
+		// will lead to duplicate error logs.
+		sbxErr, ok := sbx.AsSBXError(err)
 		if ok {
-			os.Exit(exitErr.ExitCode())
+			if !sbxErr.OutputForwarded {
+				slog.Error("The Omnissiah failed", errlog.Cause(err))
+			}
+			os.Exit(sbxErr.ExitCode)
 		} else {
 			slog.Error("The Omnissiah failed", errlog.Cause(err))
 			os.Exit(1)
@@ -140,7 +143,7 @@ func awaken(ctx context.Context) error {
 		sbx.SettingDiagnosticsAutoUpload: "false",
 	}
 	for setting, value := range sbxSettings {
-		if err := sbx.SetSetting(ctx, setting, value); err != nil {
+		if _, err := sbx.SetSetting(ctx, setting, value); err != nil {
 			return wrap.ErrorWithAttrs(
 				err,
 				"failed to set sbx setting",
@@ -151,7 +154,7 @@ func awaken(ctx context.Context) error {
 	}
 	slog.InfoContext(ctx, "Configured sbx default settings", "settings", sbxSettings)
 
-	if err := sbx.RestartDaemon(ctx); err != nil {
+	if _, err := sbx.RestartDaemon(ctx); err != nil {
 		return wrap.Error(err, "failed to restart sbx daemon")
 	}
 	slog.InfoContext(ctx, "Restarted sbx daemon to apply settings")

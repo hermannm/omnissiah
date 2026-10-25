@@ -116,7 +116,7 @@ func Initialize() (returnErr error) {
 	configPath := getConfigPath(homedir)
 
 	if fileExists(configPath.Absolute) {
-		slog.Info(fmt.Sprintf("%s already exists, skipping initialization", configPath))
+		slog.Info(fmt.Sprintf("%s already exists, skipping initialization", configPath.Short))
 		return nil
 	}
 
