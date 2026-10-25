@@ -58,7 +58,15 @@ func main() {
 						Name:        "name",
 						Required:    false,
 						UsageText:   "[name] (optional - defaults to random 3-letter name)",
-						Destination: &prayArgs.Name,
+						Destination: &prayArgs.name,
+					},
+				},
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:        "detach",
+						Aliases:     []string{"d"},
+						Usage:       "Detached mode: Leave the machine spirit running in the background",
+						Destination: &prayArgs.detach,
 					},
 				},
 				Action: func(ctx context.Context, _ *cli.Command) error {
@@ -217,7 +225,8 @@ STCLoop:
 }
 
 type prayArgs struct {
-	Name string
+	name   string
+	detach bool
 }
 
 func pray(ctx context.Context, args prayArgs) error {
@@ -236,9 +245,9 @@ func pray(ctx context.Context, args prayArgs) error {
 		return wrap.Error(err, "failed to list machine spirits for giving name to the new one")
 	}
 
-	if args.Name == "" {
+	if args.name == "" {
 		// If no name is given: Get random name from [machineSpiritNames]
-		args.Name, err = getRandomNameForMachineSpirit(existingSpirits, defaultRand())
+		args.name, err = getRandomNameForMachineSpirit(existingSpirits, defaultRand())
 		if err != nil {
 			return wrap.Error(err, "failed to get random name for machine spirit")
 		}
@@ -248,20 +257,21 @@ func pray(ctx context.Context, args prayArgs) error {
 		if slices.ContainsFunc(
 			existingSpirits,
 			func(spirit sbx.Sandbox) bool {
-				return spirit.Name == args.Name
+				return spirit.Name == args.name
 			},
 		) {
-			return fmt.Errorf("machine spirit with name '%s' already exists", args.Name)
+			return fmt.Errorf("machine spirit with name '%s' already exists", args.name)
 		}
 	}
 
-	fmt.Printf("Waking machine spirit: %s\n", color.Red.On(args.Name))
+	fmt.Printf("Waking machine spirit: %s\n", color.Red.On(args.name))
 
 	if err := sbx.Run(
 		ctx,
-		args.Name,
+		args.name,
 		project.STC.Model,
 		project.Path,
+		args.detach,
 		project.STC.Args,
 	); err != nil {
 		return err

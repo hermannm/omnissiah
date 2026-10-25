@@ -18,6 +18,7 @@ func Run(
 	sandboxName string,
 	model string,
 	path string,
+	detached bool,
 	agentArgs []string,
 ) error {
 	sbxArgs := []string{
@@ -29,6 +30,10 @@ func Run(
 		sandboxName,
 		model,
 		path,
+	}
+	if detached {
+		// https://docs.docker.com/ai/sandboxes/usage/#keep-a-sandbox-running-in-the-background
+		sbxArgs = append(sbxArgs, "--detach")
 	}
 	if len(agentArgs) != 0 {
 		// sbx docs: "Pass agent arguments after the "--" separator"
