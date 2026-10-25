@@ -58,7 +58,7 @@ USAGE:
 COMMANDS:
    awaken           Initialize Omnissiah config and set sbx defaults
    empower          Authenticate STC (AI model) providers
-   pray, p          Start a new Omnissiah session in the current Git repo
+   pray, p, pp      Start a new Omnissiah session in the current Git repo
    commune, c       Commune with existing machine spirits
    cortex, cc       Open the Cybernetica Cortex: the machine spirit control center
    exterminatus, e  Commence Exterminatus on all machine spirits, killing them

@@ -51,7 +51,7 @@ func main() {
 			},
 			{
 				Name:    "pray",
-				Aliases: []string{"p"},
+				Aliases: []string{"p", "pp"},
 				Usage:   "Start a new Omnissiah session in the current Git repo",
 				Arguments: []cli.Argument{
 					&cli.StringArg{
@@ -68,8 +68,17 @@ func main() {
 						Usage:       "Detached mode: Leave the machine spirit running in the background",
 						Destination: &prayArgs.detach,
 					},
+					&cli.BoolFlag{
+						Name:        "persistent",
+						Aliases:     []string{"p"},
+						Usage:       "Pray interactively first, leave spirit awake on exit ('pp' alias sets this)",
+						Destination: &prayArgs.persistent,
+					},
 				},
 				Action: func(ctx context.Context, _ *cli.Command) error {
+					if len(os.Args) >= 2 && os.Args[1] == "pp" {
+						prayArgs.persistent = true
+					}
 					return pray(ctx, prayArgs)
 				},
 			},
@@ -225,8 +234,9 @@ STCLoop:
 }
 
 type prayArgs struct {
-	name   string
-	detach bool
+	name       string
+	detach     bool
+	persistent bool
 }
 
 func pray(ctx context.Context, args prayArgs) error {
@@ -271,10 +281,17 @@ func pray(ctx context.Context, args prayArgs) error {
 		args.name,
 		project.STC.Model,
 		project.Path,
-		args.detach,
+		// For persistent mode, we start in detached mode and then join interactively after
+		args.detach || args.persistent,
 		project.STC.Args,
 	); err != nil {
 		return err
+	}
+
+	if args.persistent {
+		if err := sbx.RunExisting(ctx, args.name); err != nil {
+			return err
+		}
 	}
 
 	return nil
