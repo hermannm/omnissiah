@@ -463,5 +463,7 @@ func cortex(ctx context.Context) error {
 }
 
 func exterminatus(ctx context.Context) error {
+	fmt.Printf("Commencing %s\n", color.Red.On("EXTERMINATUS"))
+
 	return sbx.Prune(ctx)
 }
