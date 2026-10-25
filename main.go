@@ -331,7 +331,6 @@ func commune(ctx context.Context) error {
 		machineSpirits,
 		[]tui.PickerAction{
 			pickerActionCommune,
-			pickerActionWake,
 			pickerActionSleep,
 			pickerActionKill,
 		},
@@ -344,48 +343,39 @@ func commune(ctx context.Context) error {
 
 var (
 	pickerActionCommune = tui.PickerAction{
-		Name: "commune",
-		Key:  "c",
-		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
+		Name:       "commune",
+		Key:        "c",
+		Background: false,
+		Action: func(ctx context.Context, spirit *sbx.Sandbox) error {
+			if err := sbx.RunExisting(ctx, spirit.Name); err != nil {
+				return err
+			}
 			spirit.Status = sbx.StatusRunning
-			return &spirit, nil
+			return nil
 		},
-		Asynchronous: false,
-	}
-	pickerActionWake = tui.PickerAction{
-		Name: "wake",
-		Key:  "w",
-		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
-			spirit.Status = sbx.StatusRunning
-			return &spirit, nil
-		},
-		Asynchronous: true,
 	}
 	pickerActionSleep = tui.PickerAction{
-		Name: "sleep",
-		Key:  "s",
-		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
+		Name:       "sleep",
+		Key:        "s",
+		Background: true,
+		Action: func(ctx context.Context, spirit *sbx.Sandbox) error {
+			if err := sbx.Stop(ctx, spirit.Name); err != nil {
+				return err
+			}
 			spirit.Status = sbx.StatusStopped
-			return &spirit, nil
+			return nil
 		},
-		Asynchronous: true,
 	}
 	pickerActionKill = tui.PickerAction{
-		Name:         "kill",
-		Key:          "k",
-		Asynchronous: true,
-		Confirmation: func(item tui.PickerItem) []string {
-			firstLine := fmt.Sprintf("Kill machine spirit %s?", color.Red.On(item.Spirit.Name))
-			secondLine := item.Age
-			if item.PrimaryWorkspace != "" {
-				secondLine += " • "
-				secondLine += item.PrimaryWorkspace
+		Name:                "kill",
+		Key:                 "k",
+		Background:          true,
+		RequireConfirmation: true,
+		Action: func(ctx context.Context, spirit *sbx.Sandbox) error {
+			if err := sbx.Remove(ctx, spirit.Name, true); err != nil {
+				return err
 			}
-			return []string{firstLine, color.Gray.On(secondLine)}
-		},
-		Action: func(ctx context.Context, spirit sbx.Sandbox) (*sbx.Sandbox, error) {
-			//nolint:nilnil // Return nil spirit to remove it from the list
-			return nil, nil
+			return tui.ErrRemovePickerItem
 		},
 	}
 )

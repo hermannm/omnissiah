@@ -13,14 +13,20 @@ import (
 	"hermannm.dev/wrap"
 )
 
-func Run(ctx context.Context, name string, model string, path string, agentArgs []string) error {
+func Run(
+	ctx context.Context,
+	sandboxName string,
+	model string,
+	path string,
+	agentArgs []string,
+) error {
 	sbxArgs := []string{
 		"run",
 		// Always run in clone mode, so the agent doesn't edit our own files:
 		// https://docs.docker.com/ai/sandboxes/usage/#clone-mode
 		"--clone",
 		"--name",
-		name,
+		sandboxName,
 		model,
 		path,
 	}
@@ -31,6 +37,26 @@ func Run(ctx context.Context, name string, model string, path string, agentArgs 
 		sbxArgs = append(sbxArgs, agentArgs...)
 	}
 	return sbx(ctx, sbxArgs...)
+}
+
+func RunExisting(ctx context.Context, sandboxName string) error {
+	return sbx(ctx, "run", "--name", sandboxName)
+}
+
+func Stop(ctx context.Context, sandboxName string) error {
+	return sbx(ctx, "stop", sandboxName)
+}
+
+func Remove(ctx context.Context, sandboxName string, force bool) error {
+	args := []string{"rm", sandboxName}
+	if force {
+		args = append(args, "--force")
+	}
+	return sbx(ctx, args...)
+}
+
+func Prune(ctx context.Context) error {
+	return sbx(ctx, "prune")
 }
 
 type Setting string
@@ -52,10 +78,6 @@ func RestartDaemon(ctx context.Context) error {
 
 func TerminalUI(ctx context.Context) error {
 	return sbx(ctx, "tui")
-}
-
-func Prune(ctx context.Context) error {
-	return sbx(ctx, "prune")
 }
 
 func SetSecret(ctx context.Context, provider string) error {
