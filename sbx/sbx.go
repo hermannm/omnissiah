@@ -43,16 +43,20 @@ func RunExisting(ctx context.Context, sandboxName string) error {
 	return sbx(ctx, "run", "--name", sandboxName)
 }
 
-func Stop(ctx context.Context, sandboxName string) error {
-	return sbx(ctx, "stop", sandboxName)
+func RunExistingDetached(ctx context.Context, sandboxName string) (stdout []byte, err error) {
+	return sbxOutput(ctx, "run", "--detach", "--name", sandboxName)
 }
 
-func Remove(ctx context.Context, sandboxName string, force bool) error {
+func Stop(ctx context.Context, sandboxName string) (stdout []byte, err error) {
+	return sbxOutput(ctx, "stop", sandboxName)
+}
+
+func Remove(ctx context.Context, sandboxName string, force bool) (stdout []byte, err error) {
 	args := []string{"rm", sandboxName}
 	if force {
 		args = append(args, "--force")
 	}
-	return sbx(ctx, args...)
+	return sbxOutput(ctx, args...)
 }
 
 func Prune(ctx context.Context) error {

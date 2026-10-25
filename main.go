@@ -331,12 +331,13 @@ func commune(ctx context.Context) error {
 		machineSpirits,
 		[]tui.PickerAction{
 			pickerActionCommune,
+			pickerActionWake,
 			pickerActionSleep,
 			pickerActionKill,
 		},
 		pickerActionCommune.Name,
 	); err != nil {
-		return wrap.Error(err, "machine spirit picker failed")
+		return err
 	}
 	return nil
 }
@@ -354,12 +355,24 @@ var (
 			return spirit, nil
 		},
 	}
+	pickerActionWake = tui.PickerAction{
+		Name:       "wake",
+		Key:        "w",
+		Background: true,
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
+			if _, err := sbx.RunExistingDetached(ctx, spirit.Name); err != nil {
+				return sbx.Sandbox{}, err
+			}
+			spirit.Status = sbx.StatusRunning
+			return spirit, nil
+		},
+	}
 	pickerActionSleep = tui.PickerAction{
 		Name:       "sleep",
 		Key:        "s",
 		Background: true,
 		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
-			if err := sbx.Stop(ctx, spirit.Name); err != nil {
+			if _, err := sbx.Stop(ctx, spirit.Name); err != nil {
 				return sbx.Sandbox{}, err
 			}
 			spirit.Status = sbx.StatusStopped
@@ -372,7 +385,7 @@ var (
 		Background:          true,
 		RequireConfirmation: true,
 		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
-			if err := sbx.Remove(ctx, spirit.Name, true); err != nil {
+			if _, err := sbx.Remove(ctx, spirit.Name, true); err != nil {
 				return sbx.Sandbox{}, err
 			}
 			return spirit, tui.ErrRemovePickerItem
