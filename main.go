@@ -286,6 +286,7 @@ func pray(ctx context.Context, args prayArgs) error {
 		project.Path,
 		// For persistent mode, we start in detached mode and then join interactively after
 		args.detach || args.persistent,
+		project.Kits,
 		project.STC.Args,
 	); err != nil {
 		return err

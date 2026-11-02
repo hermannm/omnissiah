@@ -19,6 +19,7 @@ func Run(
 	model string,
 	path string,
 	detached bool,
+	kits []string,
 	agentArgs []string,
 ) error {
 	sbxArgs := []string{
@@ -30,6 +31,11 @@ func Run(
 		sandboxName,
 		model,
 		path,
+	}
+	// sbx docs on mixin kits:
+	// https://docs.docker.com/ai/sandboxes/customize/use-kits/#add-mixins
+	for _, kit := range kits {
+		sbxArgs = append(sbxArgs, "--kit", kit)
 	}
 	if detached {
 		// https://docs.docker.com/ai/sandboxes/usage/#keep-a-sandbox-running-in-the-background

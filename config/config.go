@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -17,8 +18,11 @@ import (
 )
 
 type Config struct {
-	DefaultSTC *STC      `yaml:"defaultSTC,omitempty"`
-	Projects   []Project `yaml:"projects"`
+	DefaultSTC *STC `yaml:"defaultSTC,omitempty"`
+	// sbx kits to apply to all Omnissiah prayers:
+	// https://docs.docker.com/ai/sandboxes/customize/use-kits/
+	DefaultKits []string  `yaml:"defaultKits,omitempty"`
+	Projects    []Project `yaml:"projects"`
 	// Omitted from YAML, since we set this ourselves.
 	//exhaustruct:optional
 	Path Path `yaml:"-"`
@@ -31,6 +35,8 @@ type Config struct {
 type Project struct {
 	Path string `yaml:"path"`
 	STC  *STC   `yaml:"STC,omitempty"`
+	// sbx kits to apply to Omnissiah prayers in this project
+	Kits []string `yaml:"kits,omitempty"`
 }
 
 // STC = Standard Template Construct = AI model.
@@ -105,6 +111,9 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		project.STC = cfg.DefaultSTC
 	}
 
+	// Merge project-specific kits with default kits
+	project.Kits = slices.Concat(cfg.DefaultKits, project.Kits)
+
 	return project, nil
 }
 
@@ -149,9 +158,11 @@ func Initialize() (returnErr error) {
 				Args:  []string{"--model=opus"},
 			},
 		),
+		DefaultKits: nil,
 		Projects: []Project{{
 			Path: filepath.Join("~", "example"),
 			STC:  nil,
+			Kits: nil,
 		}},
 	}
 
