@@ -1,6 +1,7 @@
 package sbx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json/v2"
 	"errors"
@@ -103,6 +104,24 @@ func List(ctx context.Context) ([]Sandbox, error) {
 	output, err := sbxOutput(ctx, "ls", "--json")
 	if err != nil {
 		return nil, err
+	}
+
+	// Annoyingly, sbx may show an update notice on `sbx ls`, even when we pass `--json`. This
+	// causes `json.Unmarshal` below to fail. So we check here if there's an update notice from sbx
+	// before unmarshaling JSON, by looking for the strange character "╭" in the output, since the
+	// update notice looks like this:
+	// ╭──────────────────────────────────────────────────────────────────────────────────╮
+	// │ Docker Sandboxes Update Available                                                │
+	// ├──────────────────────────────────────────────────────────────────────────────────┤
+	// │ v0.49.2  →  v0.50.1                                                              │
+	// ├──────────────────────────────────────────────────────────────────────────────────┤
+	// │ Release notes  https://github.com/docker/sbx-releases/releases/tag/v0.50.1       │
+	// ├──────────────────────────────────────────────────────────────────────────────────┤
+	// │ To upgrade     brew upgrade docker/tap/sbx                                       │
+	// ╰──────────────────────────────────────────────────────────────────────────────────╯
+	indexOfUpdateNotice := bytes.Index(output, []byte("╭"))
+	if indexOfUpdateNotice != -1 {
+		output = output[0:indexOfUpdateNotice]
 	}
 
 	var sandboxes []Sandbox
