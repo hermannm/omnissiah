@@ -22,8 +22,9 @@ func main() {
 		&devlog.Options{TimeFormat: devlog.TimeFormatNone, RenameErrorAttrKey: "cause"},
 	)
 
-	var prayArgs prayArgs
+	var awakenArgs awakenArgs
 	var empowerArgs empowerArgs
+	var prayArgs prayArgs
 
 	//exhaustruct:ignore
 	cmd := &cli.Command{
@@ -34,8 +35,20 @@ func main() {
 			{
 				Name:  "awaken",
 				Usage: "Initialize Omnissiah config and set sbx defaults",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:        "skip-settings",
+						Usage:       "Skip default sbx settings",
+						Destination: &awakenArgs.skipSettings,
+					},
+					&cli.BoolFlag{
+						Name:        "skip-network",
+						Usage:       "Skip sbx network policy initialization",
+						Destination: &awakenArgs.skipNetwork,
+					},
+				},
 				Action: func(ctx context.Context, _ *cli.Command) error {
-					return awaken(ctx)
+					return awaken(ctx, awakenArgs)
 				},
 			},
 			{
