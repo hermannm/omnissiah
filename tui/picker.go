@@ -119,10 +119,12 @@ func initPickerModel(
 	m.list.Title = "The Omnissiah"
 	m.list.SetStatusBarItemName("machine spirit", "machine spirits")
 
-	m.list.KeyMap.CursorUp.SetKeys("up")
-	m.list.KeyMap.CursorUp.SetHelp("↑", "up")
-	m.list.KeyMap.CursorDown.SetKeys("down")
-	m.list.KeyMap.CursorDown.SetHelp("↓", "down")
+	// Disable built-in list keybindings to remove clutter from help menu
+	// We handle up/down ourselves in [pickerModel.Update]
+	m.list.KeyMap.CursorUp.Unbind()
+	m.list.KeyMap.CursorDown.Unbind()
+	// All our keybindings fit in short help menu, so we don't need to show this binding
+	m.list.KeyMap.ShowFullHelp.Unbind()
 	m.list.DisableQuitKeybindings()
 
 	m.list.Styles.Title = m.list.Styles.Title.Foreground(colorBlack).Background(colorBlue)
@@ -173,20 +175,26 @@ func (m *pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+		// Don't react to key presses while filtering
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
 
-		if pressedKey == "esc" {
+		switch pressedKey {
+		// Handle up/down manually, because we disable bubbles keybindings to hide them from help
+		case "up":
+			m.list.CursorUp()
+			return m, nil
+		case "down":
+			m.list.CursorDown()
+			return m, nil
+		case "esc":
 			if item, ok := m.getItemWithConfirmingAction(); ok {
 				item.clearConfirmation()
 				return m, nil
 			}
-
 			return m, tea.Quit
-		}
-
-		if pressedKey == "enter" {
+		case "enter":
 			if item, ok := m.getItemWithConfirmingAction(); ok {
 				action := item.ConfirmingAction.PickerAction
 				item.clearConfirmation()
