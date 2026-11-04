@@ -44,7 +44,7 @@ func main() {
 			},
 			{
 				Name:  "empower",
-				Usage: "Authenticate STC (AI model) providers",
+				Usage: "Authenticate model providers",
 				Action: func(ctx context.Context, _ *cli.Command) error {
 					return empower(ctx)
 				},
@@ -168,25 +168,25 @@ func empower(ctx context.Context) error {
 		return wrap.Error(err, "failed to load Omnissiah config")
 	}
 
-	var stcs []config.STCModel
-	if cfg.DefaultSTC != nil {
-		stcs = append(stcs, cfg.DefaultSTC.Model)
+	var models []config.ModelName
+	if cfg.DefaultModel != nil {
+		models = append(models, cfg.DefaultModel.Name)
 	}
 	for _, project := range cfg.Projects {
-		if project.STC != nil && !slices.Contains(stcs, project.STC.Model) {
-			stcs = append(stcs, project.STC.Model)
+		if project.Model != nil && !slices.Contains(models, project.Model.Name) {
+			models = append(models, project.Model.Name)
 		}
 	}
 
-STCLoop:
-	for _, stc := range stcs {
-		provider, ok := stc.Provider()
+ModelLoop:
+	for _, model := range models {
+		provider, ok := model.Provider()
 		if !ok {
 			slog.ErrorContext(
 				ctx,
 				fmt.Sprintf(
-					"No provider configured for STC '%s', please configure sbx directly",
-					stc,
+					"No provider configured for model '%s', please configure sbx directly",
+					model,
 				),
 				"sbxDocs", "https://docs.docker.com/reference/cli/sbx/secret/set/",
 			)
@@ -196,12 +196,12 @@ STCLoop:
 		slog.InfoContext(
 			ctx,
 			fmt.Sprintf(
-				"Loading STC %s... (discovered by the tech priests of %s)",
-				color.Red.On(stc), color.Red.On(provider),
+				"Loading model %s... (discovered by the tech priests of %s)",
+				color.Red.On(model), color.Red.On(provider),
 			),
 		)
 
-		if stc == config.STCClaude {
+		if model.Matches(config.ModelClaude) {
 			fmt.Print(
 				`
   If you have a Claude subscription, you can instead run /login on your first prayer.
@@ -216,16 +216,16 @@ STCLoop:
 			}
 			if !yes {
 				fmt.Println() // Newline for spacing
-				continue STCLoop
+				continue ModelLoop
 			}
 		}
 
 		if err := sbx.SetSecret(ctx, provider); err != nil {
-			return wrap.Errorf(err, "failed to set secret for STC provider '%s'", provider)
+			return wrap.Errorf(err, "failed to set secret for model provider '%s'", provider)
 		}
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintf("Loaded all STCs configured in %s", cfg.Path.Short))
+	slog.InfoContext(ctx, fmt.Sprintf("Loaded all models configured in %s", cfg.Path.Short))
 	return nil
 }
 
@@ -276,12 +276,12 @@ func pray(ctx context.Context, args prayArgs) error {
 		ctx,
 		args.name,
 		// Use V3 models for sbx kit compatibility
-		project.STC.Model.V3(),
+		project.Model.Name.V3(),
 		project.Path,
 		// For persistent mode, we start in detached mode and then join interactively after
 		args.detach || args.persistent,
 		project.Kits,
-		project.STC.Args,
+		project.Model.Args,
 	); err != nil {
 		return err
 	}

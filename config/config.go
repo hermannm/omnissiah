@@ -18,7 +18,7 @@ import (
 )
 
 type Config struct {
-	DefaultSTC *STC `yaml:"defaultSTC,omitempty"`
+	DefaultModel *Model `yaml:"defaultModel,omitempty"`
 	// sbx kits to apply to all Omnissiah prayers:
 	// https://docs.docker.com/ai/sandboxes/customize/use-kits/
 	DefaultKits []Kit     `yaml:"defaultKits,omitempty"`
@@ -33,8 +33,8 @@ type Config struct {
 }
 
 type Project struct {
-	Path string `yaml:"path"`
-	STC  *STC   `yaml:"STC,omitempty"`
+	Path  string `yaml:"path"`
+	Model *Model `yaml:"model,omitempty"`
 	// sbx kits to apply to Omnissiah prayers in this project
 	Kits []Kit `yaml:"kits,omitempty"`
 }
@@ -63,10 +63,9 @@ func (kit Kit) Name() string {
 	return name
 }
 
-// STC = Standard Template Construct = AI model.
-type STC struct {
-	Model STCModel `yaml:"model"`
-	Args  []string `yaml:"args,omitempty"`
+type Model struct {
+	Name ModelName `yaml:"name"`
+	Args []string  `yaml:"args,omitempty"`
 }
 
 func Load() (cfg Config, returnedErr error) {
@@ -101,10 +100,10 @@ func Load() (cfg Config, returnedErr error) {
 	for i, project := range cfg.Projects {
 		cfg.Projects[i].Path = ExpandHomedir(project.Path, homedir)
 
-		if project.STC == nil && cfg.DefaultSTC == nil {
+		if project.Model == nil && cfg.DefaultModel == nil {
 			return Config{}, wrap.ErrorWithAttrs(
 				err,
-				"either `defaultSTC` or `project.STC` must be set in config",
+				"either `defaultModel` or `project.Model` must be set in config",
 				"path", configPath.Short,
 			)
 		}
@@ -134,8 +133,8 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		)
 	}
 
-	if project.STC == nil {
-		project.STC = cfg.DefaultSTC
+	if project.Model == nil {
+		project.Model = cfg.DefaultModel
 	}
 
 	// Merge project-specific kits with default kits
@@ -185,17 +184,17 @@ func Initialize() (returnErr error) {
 	defer errclose.Close(encoder, &returnErr, "YAML encoder")
 
 	startingConfig := Config{
-		DefaultSTC: new(
-			STC{
-				Model: "claude",
-				Args:  []string{"--model=opus"},
+		DefaultModel: new(
+			Model{
+				Name: "claude",
+				Args: []string{"--model=opus"},
 			},
 		),
 		DefaultKits: nil,
 		Projects: []Project{{
-			Path: filepath.Join("~", "example"),
-			STC:  nil,
-			Kits: nil,
+			Path:  filepath.Join("~", "example"),
+			Model: nil,
+			Kits:  nil,
 		}},
 	}
 
@@ -236,67 +235,74 @@ func getConfigPath(homedir string) Path {
 	}
 }
 
-type STCModel string
+type ModelName string
 
-// Known values for [STC.Model]. This list is not exhaustive, so [STC.Model] may have values outside
+// Known values for [Model.Name]. This list is not exhaustive, so [Model.Name] may have values
+// outside
 // of this list.
 //
 // See "Available agents" at https://docs.docker.com/reference/cli/sbx/run/
 const (
-	STCClaude      STCModel = "claude"
-	STCCodex       STCModel = "codex"
-	STCCopilot     STCModel = "copilot"
-	STCGemini      STCModel = "gemini"
-	STCCursor      STCModel = "cursor"
-	STCDevin       STCModel = "devin"
-	STCDockerAgent STCModel = "docker-agent"
-	STCDroid       STCModel = "droid"
-	STCKiro        STCModel = "kiro"
+	ModelClaude      ModelName = "claude"
+	ModelCodex       ModelName = "codex"
+	ModelCopilot     ModelName = "copilot"
+	ModelGemini      ModelName = "gemini"
+	ModelCursor      ModelName = "cursor"
+	ModelDevin       ModelName = "devin"
+	ModelDockerAgent ModelName = "docker-agent"
+	ModelDroid       ModelName = "droid"
+	ModelKiro        ModelName = "kiro"
 )
 
-// Provider returns the model provider for the STC, or ok=false if it's unknown.
+// Provider returns the model provider for the Model, or ok=false if it's unknown.
 //
 // See "Available services" here: https://docs.docker.com/reference/cli/sbx/secret/set/
-func (stc STCModel) Provider() (provider string, ok bool) {
-	switch stc {
-	case STCClaude:
+func (model ModelName) Provider() (provider string, ok bool) {
+	switch model {
+	case ModelClaude:
 		return "anthropic", true
-	case STCCodex:
+	case ModelCodex:
 		return "openai", true
-	case STCCopilot:
+	case ModelCopilot:
 		return "github", true
-	case STCGemini:
+	case ModelGemini:
 		return "google", true
 	default:
 		return "", false
 	}
 }
 
-// V3 returns the kit-compatible V3 sbx workload for the built-in model:
+// V3 returns the kit-compatible v3 sbx workload for the given built-in model:
 // https://docs.docker.com/ai/sandboxes/customize/use-kits/#published-v3-workloads
 //
-// If we don't have an entry for the STC model, we assume it's already V3.
-func (stc STCModel) V3() string {
-	switch stc {
-	case STCClaude:
+// If we don't have an entry for the Model model, we assume it's already V3.
+func (model ModelName) V3() string {
+	switch model {
+	case ModelClaude:
 		return "docker/sbx-kit-claude"
-	case STCCodex:
+	case ModelCodex:
 		return "docker/sbx-kit-codex"
-	case STCCopilot:
+	case ModelCopilot:
 		return "docker/sbx-kit-copilot"
-	case STCCursor:
+	case ModelCursor:
 		return "docker/sbx-kit-cursor"
-	case STCDevin:
+	case ModelDevin:
 		return "docker/sbx-kit-devin"
-	case STCDockerAgent:
+	case ModelDockerAgent:
 		return "docker/sbx-kit-docker-agent"
-	case STCDroid:
+	case ModelDroid:
 		return "docker/sbx-kit-droid"
-	case STCKiro:
+	case ModelKiro:
 		return "docker/sbx-kit-kiro"
 	default:
-		return string(stc)
+		return string(model)
 	}
+}
+
+// Matches checks if the model matches the given known model, by checking if the model name contains
+// the known model name (so e.g. "docker/sbx-kit-claude" matches "claude").
+func (model ModelName) Matches(knownModel ModelName) bool {
+	return strings.Contains(string(model), string(knownModel))
 }
 
 func fileExists(path string) bool {
