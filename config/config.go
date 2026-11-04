@@ -21,8 +21,9 @@ type Config struct {
 	DefaultModel *Model `yaml:"defaultModel,omitempty"`
 	// sbx kits to apply to all Omnissiah prayers:
 	// https://docs.docker.com/ai/sandboxes/customize/use-kits/
-	DefaultKits []Kit     `yaml:"defaultKits,omitempty"`
-	Projects    []Project `yaml:"projects"`
+	DefaultKits     []Kit     `yaml:"defaultKits,omitempty"`
+	AllowedNetworks []Network `yaml:"allowedNetworks,omitempty"`
+	Projects        []Project `yaml:"projects"`
 	// Omitted from YAML, since we set this ourselves.
 	//exhaustruct:optional
 	Path Path `yaml:"-"`
@@ -70,6 +71,11 @@ func (kit Kit) Name() string {
 type Model struct {
 	Name ModelName `yaml:"name"`
 	Args []string  `yaml:"args,omitempty"`
+}
+
+type Network struct {
+	Host    string   `yaml:"host"`
+	Methods []string `yaml:"methods,omitempty"`
 }
 
 func Load() (cfg Config, returnedErr error) {
@@ -189,7 +195,7 @@ func Initialize() (returnErr error) {
 	}
 	defer errclose.Closef(configFile, &returnErr, "config file %s", configPath.Short)
 
-	encoder := yaml.NewEncoder(configFile)
+	encoder := yaml.NewEncoder(configFile, yaml.IndentSequence(true))
 	defer errclose.Close(encoder, &returnErr, "YAML encoder")
 
 	startingConfig := Config{
@@ -200,6 +206,9 @@ func Initialize() (returnErr error) {
 			},
 		),
 		DefaultKits: nil,
+		AllowedNetworks: []Network{
+			{Host: "registry.npmjs.org", Methods: []string{"GET"}},
+		},
 		Projects: []Project{{
 			Path:  filepath.Join("~", "example"),
 			Model: nil,

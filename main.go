@@ -28,6 +28,7 @@ func main() {
 	)
 
 	var prayArgs prayArgs
+	var empowerArgs empowerArgs
 
 	//exhaustruct:ignore
 	cmd := &cli.Command{
@@ -44,9 +45,16 @@ func main() {
 			},
 			{
 				Name:  "empower",
-				Usage: "Authenticate model providers",
+				Usage: "Post-config setup (model provider authentication, sbx network policies)",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:        "skip-auth",
+						Usage:       "Skip model provider authentication",
+						Destination: &empowerArgs.skipAuth,
+					},
+				},
 				Action: func(ctx context.Context, _ *cli.Command) error {
-					return empower(ctx)
+					return empower(ctx, empowerArgs)
 				},
 			},
 			{
@@ -154,6 +162,18 @@ func awaken(ctx context.Context) error {
 	}
 	slog.InfoContext(ctx, "Configured sbx default settings", "settings", sbxSettings)
 
+	if _, err := sbx.ResetPolicies(ctx); err != nil {
+		return wrap.Error(err, "failed to reset sbx policies (needed to init network policy)")
+	}
+	if _, err := sbx.InitNetworkPolicy(ctx, sbx.NetworkPolicyDenyAll); err != nil {
+		return wrap.Errorf(
+			err,
+			"failed to initialize '%s' sbx network policy",
+			sbx.NetworkPolicyDenyAll,
+		)
+	}
+	slog.InfoContext(ctx, "Initialized sbx network policy", "policy", sbx.NetworkPolicyDenyAll)
+
 	if _, err := sbx.RestartDaemon(ctx); err != nil {
 		return wrap.Error(err, "failed to restart sbx daemon")
 	}
@@ -162,12 +182,30 @@ func awaken(ctx context.Context) error {
 	return nil
 }
 
-func empower(ctx context.Context) error {
+type empowerArgs struct {
+	skipAuth bool
+}
+
+func empower(ctx context.Context, args empowerArgs) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return wrap.Error(err, "failed to load Omnissiah config")
 	}
 
+	if !args.skipAuth {
+		if err := authenticateModels(ctx, cfg); err != nil {
+			return wrap.Error(err, "failed to authenticate models")
+		}
+	}
+
+	if err := allowNetworks(ctx, cfg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func authenticateModels(ctx context.Context, cfg config.Config) error {
 	var models []config.ModelName
 	if cfg.DefaultModel != nil {
 		models = append(models, cfg.DefaultModel.Name)
@@ -196,7 +234,7 @@ ModelLoop:
 		slog.InfoContext(
 			ctx,
 			fmt.Sprintf(
-				"Loading model %s... (discovered by the tech priests of %s)",
+				"Authenticating model %s... (discovered by the tech priests of %s)",
 				color.Red.On(model), color.Red.On(provider),
 			),
 		)
@@ -208,9 +246,9 @@ ModelLoop:
   This stores a session token on your host. Read sbx docs for more:
   https://docs.docker.com/ai/sandboxes/get-started/#authenticate-your-agent
 
-  Do you still want to set an API token? (y/n) `,
+  Do you still want to set an API token? (y/N) `,
 			)
-			yes, err := tui.PromptUserYesOrNo()
+			yes, err := tui.PromptUserYesOrNo(new(false))
 			if err != nil {
 				return wrap.Error(err, "yes/no prompt failed")
 			}
@@ -225,7 +263,25 @@ ModelLoop:
 		}
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintf("Loaded all models configured in %s", cfg.Path.Short))
+	slog.InfoContext(ctx, fmt.Sprintf("Authenticated all models configured in %s", cfg.Path.Short))
+	return nil
+}
+
+func allowNetworks(ctx context.Context, cfg config.Config) error {
+	for _, network := range cfg.AllowedNetworks {
+		if _, err := sbx.AllowNetwork(ctx, network); err != nil {
+			return wrap.ErrorWithAttrs(
+				err,
+				"failed to allow network in sbx policy",
+				"network", network,
+			)
+		}
+	}
+	slog.InfoContext(
+		ctx,
+		"Configured allowed networks in sbx policy",
+		"allowedNetworks", cfg.AllowedNetworks,
+	)
 	return nil
 }
 

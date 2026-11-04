@@ -37,11 +37,9 @@ sandboxing AI agents).
       mise use -g go:hermannm.dev/omnissiah
       ```
 3. Run `omnissiah awaken` to initialize Omnissiah config and set `sbx` defaults
-4. Edit `~/.config/omnissiah/config.yml` to configure your projects (see [Config](#config) below)
-5. Run `omnissiah empower` to authenticate the model providers you configured
-    - If you use Claude, you can instead run `/login` on your first prayer, which stores a session
-      token on your host ([see
-      `sbx` docs](https://docs.docker.com/ai/sandboxes/get-started/#authenticate-your-agent))
+4. Edit `~/.config/omnissiah/config.yml` to configure your projects and default settings
+   (see [Config](#config) below)
+5. Run `omnissiah empower` to complete post-config setup
 6. (Optional) Set `omni` alias for Omnissiah:
    ```shell
    alias omni='omnissiah'
@@ -57,7 +55,7 @@ USAGE:
 
 COMMANDS:
    awaken           Initialize Omnissiah config and set sbx defaults
-   empower          Authenticate model providers
+   empower          Post-config setup (model provider authentication, sbx network policies)
    pray, p, pp      Start a new Omnissiah session in the current Git repo
    commune, c       Commune with existing machine spirits
    cortex, cc       Open the Cybernetica Cortex: the machine spirit control center
@@ -94,6 +92,13 @@ defaultKits:
   # https://docs.docker.com/ai/sandboxes/customize/author/tool-mixins/
   # When doing this, you may have to configure Docker to use `containerd`
   - path: ~/.config/omnissiah/kits/example
+# Networks that we want to allow the machine spirit to connect to. The Omnissiah initializes the
+# network policy to `deny-all`, and only allows networks in this list, for full control
+# https://docs.docker.com/reference/cli/sbx/policy/allow/network/
+allowedNetworks:
+  - host: registry.npmjs.org
+    # Restrict HTTP methods (default: all methods allowed)
+    methods: [ GET ]
 # Project config: `omnissiah pray` can only be used under these paths
 # This is to avoid sharing unintended files with a machine spirit (AI agent)
 projects:

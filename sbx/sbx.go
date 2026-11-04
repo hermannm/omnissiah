@@ -102,6 +102,37 @@ func SetSetting(ctx context.Context, setting Setting, value string) (stdout []by
 	return sbxOutput(ctx, "settings", "set", string(setting), value)
 }
 
+type NetworkPolicy string
+
+// https://docs.docker.com/reference/cli/sbx/policy/init/
+//
+//goland:noinspection GoUnusedConst
+const (
+	NetworkPolicyAllowAll NetworkPolicy = "allow-all"
+	NetworkPolicyBalanced NetworkPolicy = "balanced"
+	NetworkPolicyDenyAll  NetworkPolicy = "deny-all"
+)
+
+func InitNetworkPolicy(ctx context.Context, policy NetworkPolicy) (stdout []byte, err error) {
+	return sbxOutput(ctx, "policy", "init", string(policy))
+}
+
+func ResetPolicies(ctx context.Context) (stdout []byte, err error) {
+	return sbxOutput(ctx, "policy", "reset", "--force")
+}
+
+func AllowNetwork(ctx context.Context, network config.Network) (stdout []byte, err error) {
+	args := []string{"policy", "allow", "network", network.Host}
+
+	if len(network.Methods) != 0 {
+		// --method docs: "Restrict the rule to these HTTP methods (comma-separated)"
+		// https://docs.docker.com/reference/cli/sbx/policy/allow/network/
+		args = append(args, "--method", strings.Join(network.Methods, ","))
+	}
+
+	return sbxOutput(ctx, args...)
+}
+
 func RestartDaemon(ctx context.Context) (stdout []byte, err error) {
 	return sbxOutput(ctx, "daemon", "restart")
 }
