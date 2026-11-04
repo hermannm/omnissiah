@@ -14,7 +14,7 @@ import (
 	"hermannm.dev/errclose"
 	"hermannm.dev/wrap"
 
-	"hermannm.dev/omnissiah/internal/sliceutil"
+	"hermannm.dev/omnissiah/internal/iterutil"
 )
 
 type Config struct {
@@ -191,7 +191,7 @@ func Load() (cfg Config, returnedErr error) {
 }
 
 func (cfg Config) GetProject(projectName string) (Project, error) {
-	project, ok := sliceutil.Find(
+	project, ok := iterutil.Find(
 		cfg.Projects,
 		func(project Project) bool {
 			return project.Name == projectName
@@ -210,7 +210,7 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		return Project{}, wrap.Error(err, "failed to get current directory to determine project")
 	}
 
-	project, ok := sliceutil.Find(
+	project, ok := iterutil.Find(
 		cfg.Projects,
 		func(p Project) bool {
 			return strings.HasPrefix(path, p.AbsolutePath)

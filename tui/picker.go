@@ -15,11 +15,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"hermannm.dev/wrap"
 
-	"hermannm.dev/omnissiah/internal/color"
-
 	"hermannm.dev/omnissiah/config"
-
-	"hermannm.dev/omnissiah/internal/sliceutil"
+	"hermannm.dev/omnissiah/internal/color"
+	"hermannm.dev/omnissiah/internal/iterutil"
 	"hermannm.dev/omnissiah/sbx"
 )
 
@@ -190,7 +188,7 @@ func (m *pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 
-			defaultAction, ok := sliceutil.Find(
+			defaultAction, ok := iterutil.Find(
 				m.actions,
 				func(action PickerAction) bool {
 					return action.Name == m.defaultAction
@@ -393,7 +391,7 @@ type ConfirmingAction struct {
 func initPickerItems(spirits []sbx.Sandbox, homedir string) []list.Item {
 	now := time.Now()
 
-	return sliceutil.Map(
+	return iterutil.Map(
 		spirits,
 		func(spirit sbx.Sandbox) list.Item {
 			return makePickerItem(spirit, now, homedir)
@@ -518,7 +516,7 @@ func initPickerItemDelegate(actions []PickerAction, defaultAction string) list.I
 	delegate.Styles.DimmedTitle = delegate.Styles.NormalTitle
 	delegate.Styles.DimmedDesc = delegate.Styles.NormalDesc
 
-	keyBindings := sliceutil.Map(
+	keyBindings := iterutil.Map(
 		actions,
 		func(action PickerAction) key.Binding {
 			if action.Name == defaultAction {

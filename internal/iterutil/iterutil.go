@@ -1,5 +1,5 @@
-// Package sliceutil extends the standard [slices] package with additional utility functions.
-package sliceutil
+// Package iterutil extends the standard [slices] package with additional utility functions.
+package iterutil
 
 func Find[E any](slice []E, match func(E) bool) (found E, ok bool) {
 	for _, e := range slice {
