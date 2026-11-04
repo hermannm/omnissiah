@@ -35,25 +35,33 @@ func Run(
 		model,
 		path,
 	}
+	if detached {
+		// https://docs.docker.com/ai/sandboxes/usage/#keep-a-sandbox-running-in-the-background
+		sbxArgs = append(sbxArgs, "--detach")
+	}
+
 	// sbx docs on mixin kits:
 	// https://docs.docker.com/ai/sandboxes/customize/use-kits/#add-mixins
 	for _, kit := range kits {
 		sbxArgs = append(sbxArgs, "--kit", kit.AbsolutePath)
 		name := kit.Name()
+		// https://docs.docker.com/ai/sandboxes/customize/use-kits/#pass-arguments-to-kits
 		for _, arg := range kit.Args {
 			sbxArgs = append(sbxArgs, "--kit-arg", name+"."+arg)
 		}
+		// https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-directories-for-kit-host-mounts
+		for _, mount := range kit.Mounts {
+			sbxArgs = append(sbxArgs, "--mount", mount)
+		}
 	}
-	if detached {
-		// https://docs.docker.com/ai/sandboxes/usage/#keep-a-sandbox-running-in-the-background
-		sbxArgs = append(sbxArgs, "--detach")
-	}
+
 	if len(agentArgs) != 0 {
 		// sbx docs: "Pass agent arguments after the "--" separator"
 		// https://docs.docker.com/reference/cli/sbx/run/
 		sbxArgs = append(sbxArgs, "--")
 		sbxArgs = append(sbxArgs, agentArgs...)
 	}
+
 	return sbx(ctx, sbxArgs...)
 }
 
