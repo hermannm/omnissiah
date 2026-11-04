@@ -81,7 +81,11 @@ defaultSTC:
 # sbx kits to apply to all Omnissiah prayers (agent sessions)
 # See sbx docs: https://docs.docker.com/ai/sandboxes/customize/use-kits/
 defaultKits:
-  - docker.io/example/example-kit:1.0.0
+  - path: docker.io/example/example-kit:1.0.0
+  # Kit paths may point to your file system, see sbx docs:
+  # https://docs.docker.com/ai/sandboxes/customize/author/tool-mixins/
+  # When doing this, you may have to configure Docker to use `containerd`
+  - path: ~/.config/omnissiah/kits/example
 # Project config: `omnissiah pray` can only be used under these paths
 # This is to avoid sharing unintended files with a machine spirit (AI agent)
 projects:

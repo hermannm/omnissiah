@@ -28,11 +28,11 @@ var (
 )
 
 // On applies the given color on the given string, if stdout supports ANSI colors.
-func (c Color) On(s string) string {
+func (c Color) On[S ~string](s S) string {
 	if !supportsColor() {
-		return s
+		return string(s)
 	}
-	return c.string + s + reset.string
+	return c.string + string(s) + reset.string
 }
 
 func (c Color) Write(writer io.Writer) error {

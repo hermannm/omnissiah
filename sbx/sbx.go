@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"hermannm.dev/wrap"
+
+	"hermannm.dev/omnissiah/config"
 )
 
 func Run(
@@ -20,7 +22,7 @@ func Run(
 	model string,
 	path string,
 	detached bool,
-	kits []string,
+	kits []config.Kit,
 	agentArgs []string,
 ) error {
 	sbxArgs := []string{
@@ -36,7 +38,11 @@ func Run(
 	// sbx docs on mixin kits:
 	// https://docs.docker.com/ai/sandboxes/customize/use-kits/#add-mixins
 	for _, kit := range kits {
-		sbxArgs = append(sbxArgs, "--kit", kit)
+		sbxArgs = append(sbxArgs, "--kit", kit.AbsolutePath)
+		name := kit.Name()
+		for _, arg := range kit.Args {
+			sbxArgs = append(sbxArgs, "--kit-arg", name+"."+arg)
+		}
 	}
 	if detached {
 		// https://docs.docker.com/ai/sandboxes/usage/#keep-a-sandbox-running-in-the-background

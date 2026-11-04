@@ -168,7 +168,7 @@ func empower(ctx context.Context) error {
 		return wrap.Error(err, "failed to load Omnissiah config")
 	}
 
-	var stcs []string
+	var stcs []config.STCModel
 	if cfg.DefaultSTC != nil {
 		stcs = append(stcs, cfg.DefaultSTC.Model)
 	}
@@ -178,16 +178,9 @@ func empower(ctx context.Context) error {
 		}
 	}
 
-	// See "Available services" here: https://docs.docker.com/reference/cli/sbx/secret/set/
-	stcProviderMap := map[string]string{
-		config.STCClaude:  "anthropic",
-		config.STCCodex:   "openai",
-		config.STCCopilot: "github",
-		config.STCGemini:  "google",
-	}
 STCLoop:
 	for _, stc := range stcs {
-		provider, ok := stcProviderMap[stc]
+		provider, ok := stc.Provider()
 		if !ok {
 			slog.ErrorContext(
 				ctx,
@@ -282,7 +275,8 @@ func pray(ctx context.Context, args prayArgs) error {
 	if err := sbx.Run(
 		ctx,
 		args.name,
-		project.STC.Model,
+		// Use V3 models for sbx kit compatibility
+		project.STC.Model.V3(),
 		project.Path,
 		// For persistent mode, we start in detached mode and then join interactively after
 		args.detach || args.persistent,

@@ -222,7 +222,7 @@ func (m *pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if err != nil {
 			if errors.Is(err, ErrRemovePickerItem) {
-				m.list.RemoveItem(itemIndex)
+				m.removeItem(itemIndex)
 				return m, nil
 			}
 
@@ -349,6 +349,23 @@ func (m *pickerModel) getItemBySpiritName(name string) (item *PickerItem, index 
 		return nil, 0, fmt.Errorf("no picker item found for machine spirit '%s'", name)
 	}
 	return item, index, nil
+}
+
+func (m *pickerModel) removeItem(index int) {
+	m.list.RemoveItem(index)
+
+	// If we remove the currently selected item, no item is selected after. So we reset selection
+	items := m.list.Items()
+	switch {
+	case len(items) == 0:
+		// No-op
+	case index < len(items):
+		// Index lower than number of items in list: Select item that was after the one we removed
+		m.list.Select(index)
+	default:
+		// Otherwise: we removed last item in the list, so reselect the current last item
+		m.list.Select(len(items) - 1)
+	}
 }
 
 func (m *pickerModel) View() tea.View {

@@ -21,7 +21,7 @@ type Config struct {
 	DefaultSTC *STC `yaml:"defaultSTC,omitempty"`
 	// sbx kits to apply to all Omnissiah prayers:
 	// https://docs.docker.com/ai/sandboxes/customize/use-kits/
-	DefaultKits []string  `yaml:"defaultKits,omitempty"`
+	DefaultKits []Kit     `yaml:"defaultKits,omitempty"`
 	Projects    []Project `yaml:"projects"`
 	// Omitted from YAML, since we set this ourselves.
 	//exhaustruct:optional
@@ -36,12 +36,36 @@ type Project struct {
 	Path string `yaml:"path"`
 	STC  *STC   `yaml:"STC,omitempty"`
 	// sbx kits to apply to Omnissiah prayers in this project
-	Kits []string `yaml:"kits,omitempty"`
+	Kits []Kit `yaml:"kits,omitempty"`
+}
+
+type Kit struct {
+	// From sbx docs: "directory, ZIP, git, or OCI"
+	Path string `yaml:"path"`
+	// Set with [Kit.setAbsolutePath].
+	//exhaustruct:optional
+	AbsolutePath string `yaml:"-"`
+	// Arguments to pass to the kit (Docker build args).
+	Args []string `yaml:"args,omitempty"`
+}
+
+// Name returns the sbx "name" of the kit, which is the last path component of the kit's path.
+// Used to set kit args for specific kits.
+//
+// Not really well documented, but hinted at here: "A workload's agent name comes from the last
+// component of its repository name"
+// https://docs.docker.com/ai/sandboxes/customize/use-kits/#published-v3-workloads
+func (kit Kit) Name() string {
+	// First remove string after ":", which is the version
+	name, _, _ := strings.CutLast(kit.AbsolutePath, ":")
+	// Then split the last path component
+	_, name = filepath.Split(name)
+	return name
 }
 
 // STC = Standard Template Construct = AI model.
 type STC struct {
-	Model string   `yaml:"model"`
+	Model STCModel `yaml:"model"`
 	Args  []string `yaml:"args,omitempty"`
 }
 
@@ -71,6 +95,7 @@ func Load() (cfg Config, returnedErr error) {
 	}
 	cfg.Path = configPath
 	cfg.Homedir = homedir
+	setAbsoluteKitPaths(cfg.DefaultKits, homedir)
 
 	// Expand uses of ~ in project paths
 	for i, project := range cfg.Projects {
@@ -83,6 +108,8 @@ func Load() (cfg Config, returnedErr error) {
 				"path", configPath.Short,
 			)
 		}
+
+		setAbsoluteKitPaths(project.Kits, homedir)
 	}
 
 	return cfg, nil
@@ -115,6 +142,12 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 	project.Kits = slices.Concat(cfg.DefaultKits, project.Kits)
 
 	return project, nil
+}
+
+func setAbsoluteKitPaths(kits []Kit, homedir string) {
+	for i := range kits {
+		kits[i].AbsolutePath = ExpandHomedir(kits[i].Path, homedir)
+	}
 }
 
 func Initialize() (returnErr error) {
@@ -203,15 +236,68 @@ func getConfigPath(homedir string) Path {
 	}
 }
 
-// Known values for [STC.Model].
+type STCModel string
+
+// Known values for [STC.Model]. This list is not exhaustive, so [STC.Model] may have values outside
+// of this list.
 //
 // See "Available agents" at https://docs.docker.com/reference/cli/sbx/run/
 const (
-	STCClaude  = "claude"
-	STCCodex   = "codex"
-	STCCopilot = "copilot"
-	STCGemini  = "gemini"
+	STCClaude      STCModel = "claude"
+	STCCodex       STCModel = "codex"
+	STCCopilot     STCModel = "copilot"
+	STCGemini      STCModel = "gemini"
+	STCCursor      STCModel = "cursor"
+	STCDevin       STCModel = "devin"
+	STCDockerAgent STCModel = "docker-agent"
+	STCDroid       STCModel = "droid"
+	STCKiro        STCModel = "kiro"
 )
+
+// Provider returns the model provider for the STC, or ok=false if it's unknown.
+//
+// See "Available services" here: https://docs.docker.com/reference/cli/sbx/secret/set/
+func (stc STCModel) Provider() (provider string, ok bool) {
+	switch stc {
+	case STCClaude:
+		return "anthropic", true
+	case STCCodex:
+		return "openai", true
+	case STCCopilot:
+		return "github", true
+	case STCGemini:
+		return "google", true
+	default:
+		return "", false
+	}
+}
+
+// V3 returns the kit-compatible V3 sbx workload for the built-in model:
+// https://docs.docker.com/ai/sandboxes/customize/use-kits/#published-v3-workloads
+//
+// If we don't have an entry for the STC model, we assume it's already V3.
+func (stc STCModel) V3() string {
+	switch stc {
+	case STCClaude:
+		return "docker/sbx-kit-claude"
+	case STCCodex:
+		return "docker/sbx-kit-codex"
+	case STCCopilot:
+		return "docker/sbx-kit-copilot"
+	case STCCursor:
+		return "docker/sbx-kit-cursor"
+	case STCDevin:
+		return "docker/sbx-kit-devin"
+	case STCDockerAgent:
+		return "docker/sbx-kit-docker-agent"
+	case STCDroid:
+		return "docker/sbx-kit-droid"
+	case STCKiro:
+		return "docker/sbx-kit-kiro"
+	default:
+		return string(stc)
+	}
+}
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
