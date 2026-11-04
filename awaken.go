@@ -24,6 +24,8 @@ func awaken(ctx context.Context) error {
 		// Disable sending diagnostics, since "collected logs can still contain user content":
 		// https://docs.docker.com/ai/sandboxes/troubleshooting/#enable-automatic-diagnostics-uploads
 		sbx.SettingDiagnosticsAutoUpload: "false",
+		// Allow us to copy text from the sandbox
+		sbx.SettingClipboardTextCopy: "true",
 	}
 	for setting, value := range sbxSettings {
 		if _, err := sbx.SetSetting(ctx, setting, value); err != nil {
