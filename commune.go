@@ -25,6 +25,7 @@ func commune(ctx context.Context) error {
 			pickerActionWake,
 			pickerActionSleep,
 			pickerActionKill,
+			pickerActionExterminatus,
 		},
 		pickerActionCommune.Name,
 	); err != nil {
@@ -70,15 +71,27 @@ var (
 		},
 	}
 	pickerActionKill = tui.PickerAction{
-		Name:                "kill",
-		Key:                 "k",
-		Background:          "Killing...",
-		RequireConfirmation: true,
+		Name:         "kill",
+		Key:          "k",
+		Confirmation: "Kill %s?",
+		Background:   "Killing...",
 		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
-			if _, err := sbx.Remove(ctx, spirit.Name, true); err != nil {
+			if _, err := sbx.Remove(ctx, spirit.Name); err != nil {
 				return sbx.Sandbox{}, err
 			}
 			return spirit, tui.ErrRemovePickerItem
+		},
+	}
+	pickerActionExterminatus = tui.PickerAction{
+		Name:         "exterminatus",
+		Key:          "e",
+		Confirmation: "Commence EXTERMINATUS?",
+		Background:   "Commencing EXTERMINATUS...",
+		Action: func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error) {
+			if _, err := sbx.RemoveAll(ctx); err != nil {
+				return sbx.Sandbox{}, err
+			}
+			return spirit, tui.ErrRemoveAllPickerItems
 		},
 	}
 )

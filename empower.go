@@ -93,7 +93,7 @@ func bootstrapProject(ctx context.Context, project config.Project) (returnErr er
 	// This machine spirit is only temporary for the bootstrap process, so we kill it after
 	defer errclose.Cleanupf(
 		func() error {
-			_, err := sbx.Remove(ctx, spiritName, true)
+			_, err := sbx.Remove(ctx, spiritName)
 			return err
 		},
 		&returnErr, "failed to kill machine spirit '%s' after bootstrap", spiritName,

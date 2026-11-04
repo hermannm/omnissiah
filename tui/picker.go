@@ -61,14 +61,20 @@ type PickerAction struct {
 	// If this action should run in the background (i.e., not terminate the picker to perform the
 	// action): Set this to a string describing what is being done.
 	//exhaustruct:optional
-	Background          string
-	RequireConfirmation bool //exhaustruct:optional
+	Background string
+	// If set, require confirmation before doing the action, prompting with the given string.
+	// If the string includes '%s', that will be replaced by the spirit name.
+	//exhaustruct:optional
+	Confirmation string
 	// Return updated machine spirit. Return [ErrRemovePickerItem] (and the spirit) to remove the
 	// item from the picker after the action.
 	Action func(ctx context.Context, spirit sbx.Sandbox) (sbx.Sandbox, error)
 }
 
-var ErrRemovePickerItem = errors.New("remove picker item")
+var (
+	ErrRemovePickerItem     = errors.New("remove picker item")
+	ErrRemoveAllPickerItems = errors.New("remove all picker items")
+)
 
 type pickerModel struct {
 	//nolint:containedctx // Only way to propagate context through bubbletea
@@ -219,13 +225,17 @@ func (m *pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		item.BackgroundAction = ""
 
 		if err != nil {
-			if errors.Is(err, ErrRemovePickerItem) {
+			switch {
+			case errors.Is(err, ErrRemovePickerItem):
 				m.removeItem(itemIndex)
 				return m, nil
+			case errors.Is(err, ErrRemoveAllPickerItems):
+				m.removeAllItems()
+				return m, nil
+			default:
+				m.err = err
+				return m, tea.Quit
 			}
-
-			m.err = err
-			return m, tea.Quit
 		}
 
 		m.list.SetItem(itemIndex, makePickerItem(spirit, time.Now(), m.homedir))
@@ -246,7 +256,7 @@ func (m *pickerModel) executeAction(action PickerAction, confirmed bool) tea.Cmd
 		return nil
 	}
 
-	if action.RequireConfirmation && !confirmed {
+	if action.Confirmation != "" && !confirmed {
 		selected.setConfirmingAction(action)
 		return nil
 	}
@@ -366,6 +376,19 @@ func (m *pickerModel) removeItem(index int) {
 	}
 }
 
+func (m *pickerModel) removeAllItems() {
+	iterations := 0
+	// Remove items from the list until it is empty, but prevent infinite loop
+	for len(m.list.Items()) != 0 {
+		m.list.RemoveItem(0)
+
+		iterations++
+		if iterations >= 10_000 {
+			panic("Unbounded iterations while removing all items from picker")
+		}
+	}
+}
+
 func (m *pickerModel) View() tea.View {
 	v := tea.NewView(docStyle.Render(m.list.View()))
 	v.AltScreen = true
@@ -460,16 +483,9 @@ func (i *PickerItem) setConfirmingAction(action PickerAction) {
 
 	color.Yellow.Set(&prompt)
 
-	if len(action.Name) > 0 {
-		prompt.WriteString(strings.ToTitle(action.Name[0:1]))
-		if len(action.Name) > 1 {
-			prompt.WriteString(action.Name[1:])
-		}
-	}
-
-	prompt.WriteByte(' ')
-	prompt.WriteString(i.Spirit.Name)
-	prompt.WriteByte('?')
+	// See [PickerAction.Confirmation].
+	confirmation := strings.Replace(action.Confirmation, "%s", i.Spirit.Name, 1)
+	prompt.WriteString(confirmation)
 	prompt.WriteByte(' ')
 
 	color.Gray.Set(&prompt)

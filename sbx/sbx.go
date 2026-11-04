@@ -111,12 +111,13 @@ func Stop(ctx context.Context, sandboxName string) (stdout []byte, err error) {
 }
 
 // https://docs.docker.com/reference/cli/sbx/rm/
-func Remove(ctx context.Context, sandboxName string, force bool) (stdout []byte, err error) {
-	args := []string{"rm", sandboxName}
-	if force {
-		args = append(args, "--force")
-	}
-	return sbxOutput(ctx, args...)
+func Remove(ctx context.Context, sandboxName string) (stdout []byte, err error) {
+	return sbxOutput(ctx, "rm", "--force", sandboxName)
+}
+
+// https://docs.docker.com/reference/cli/sbx/rm/
+func RemoveAll(ctx context.Context) (stdout []byte, err error) {
+	return sbxOutput(ctx, "rm", "--all", "--force")
 }
 
 // https://docs.docker.com/reference/cli/sbx/prune/
