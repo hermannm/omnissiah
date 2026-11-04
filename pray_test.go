@@ -82,6 +82,7 @@ type incrementingRandSource struct {
 	count uint64
 }
 
+// Implements [rand.Source].
 func (source *incrementingRandSource) Uint64() uint64 {
 	value := source.count
 	source.count++
