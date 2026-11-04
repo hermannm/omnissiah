@@ -79,12 +79,12 @@ func bootstrapProject(ctx context.Context, project config.Project) error {
 	if err := sbx.RunDetached(
 		ctx,
 		spiritName,
-		project.Model.Name.V3(),
+		// project.Model should never be nil here (populated with cfg.DefaultModel if not set)
+		*project.Model,
 		project.AbsolutePath,
 		// No template when bootstrapping
 		"",
 		project.Kits,
-		project.Model.Args,
 	); err != nil {
 		return err
 	}

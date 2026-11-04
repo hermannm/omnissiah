@@ -20,12 +20,11 @@ import (
 func RunDetached(
 	ctx context.Context,
 	sandboxName string,
-	model string,
+	model config.Model,
 	path string,
 	// Optional (blank when bootstrapping initial template)
 	templateTag string,
 	kits []config.Kit,
-	agentArgs []string,
 ) error {
 	sbxArgs := []string{
 		"run",
@@ -40,30 +39,39 @@ func RunDetached(
 		"--detach",
 		"--name",
 		sandboxName,
-		model,
+		// Use V3 models for sbx kit compatibility
+		model.Name.V3(),
 		path,
 	}
 	if templateTag != "" {
+		// We only run local templates, so we never want to pull images
 		sbxArgs = append(sbxArgs, "--pull", "never")
 		sbxArgs = append(sbxArgs, "--template", templateTag)
+	}
+
+	// Models are kits in sbx, so we can pass kit args to the model kit.
+	// For example, the built-in claude kit takes a 'model' argument - see 'args:' here:
+	// https://hub.docker.com/layers/sbx/claude/latest/images/latest/sbx-kit-spec
+	for _, modelKitArg := range model.KitArgs {
+		sbxArgs = append(sbxArgs, "--kit-arg", model.ShortKitName()+"."+modelKitArg)
 	}
 
 	// sbx docs on mixin kits:
 	// https://docs.docker.com/ai/sandboxes/customize/use-kits/#add-mixins
 	for _, kit := range kits {
 		sbxArgs = append(sbxArgs, "--kit", kit.AbsolutePath)
-		name := kit.Name()
+		name := kit.ShortName()
 		// https://docs.docker.com/ai/sandboxes/customize/use-kits/#pass-arguments-to-kits
 		for _, arg := range kit.Args {
 			sbxArgs = append(sbxArgs, "--kit-arg", name+"."+arg)
 		}
 	}
 
-	if len(agentArgs) != 0 {
+	if len(model.Args) != 0 {
 		// sbx docs: "Pass agent arguments after the "--" separator"
 		// https://docs.docker.com/reference/cli/sbx/run/
 		sbxArgs = append(sbxArgs, "--")
-		sbxArgs = append(sbxArgs, agentArgs...)
+		sbxArgs = append(sbxArgs, model.Args...)
 	}
 
 	return sbx(ctx, sbxArgs...)
@@ -123,6 +131,7 @@ const (
 	SettingSSHAgentForwardingEnabled Setting = "ssh.agentForwardingEnabled"
 	SettingSkillsDefaultMode         Setting = "skills.defaultMode"
 	SettingDiagnosticsAutoUpload     Setting = "diagnostics.autoUpload"
+	SettingClipboardTextCopy         Setting = "clipboard.textCopy"
 )
 
 // https://docs.docker.com/reference/cli/sbx/settings/set/

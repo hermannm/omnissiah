@@ -55,6 +55,24 @@ func (project Project) FullTemplateTag() string {
 	return "docker.io/library/" + project.TemplateName() + ":latest"
 }
 
+type Model struct {
+	Name ModelName `yaml:"name"`
+	// Args to the model.
+	Args []string `yaml:"args,omitempty"`
+	// Args for the sbx kit that the model is built on.
+	KitArgs []string `yaml:"kitArgs,omitempty"`
+}
+
+// See [Kit.ShortName] (models are kits in sbx).
+func (model Model) ShortKitName() string {
+	return getShortKitName(model.Name.V3())
+}
+
+type Network struct {
+	Host    string   `yaml:"host"`
+	Methods []string `yaml:"methods,omitempty"`
+}
+
 type Kit struct {
 	// From sbx docs: "directory, ZIP, git, or OCI"
 	Path string `yaml:"path"`
@@ -65,15 +83,20 @@ type Kit struct {
 	Args []string `yaml:"args,omitempty"`
 }
 
-// Name returns the sbx "name" of the kit, which is the last path component of the kit's path.
+// ShortName returns the sbx "name" of the kit, which is the last path component of the kit's path.
 // Used to set kit args for specific kits.
 //
 // Not really well documented, but hinted at here: "A workload's agent name comes from the last
 // component of its repository name"
 // https://docs.docker.com/ai/sandboxes/customize/use-kits/#published-v3-workloads
-func (kit Kit) Name() string {
+func (kit Kit) ShortName() string {
+	return getShortKitName(kit.AbsolutePath)
+}
+
+// See [Kit.ShortName].
+func getShortKitName(fullName string) string {
 	// First remove string after ":", which is the version
-	name, _, _ := strings.CutLast(kit.AbsolutePath, ":")
+	name, _, _ := strings.CutLast(fullName, ":")
 	// Then split the last path component
 	_, name = filepath.Split(name)
 	return name
@@ -115,16 +138,6 @@ const agentHomedir = "/home/agent"
 func (cp *BootstrapCopy) setAbsolutePaths(userHomedir string) {
 	cp.FromAbsolute = ExpandHomedir(cp.From, userHomedir)
 	cp.ToAbsolute = ExpandHomedir(cp.To, agentHomedir)
-}
-
-type Model struct {
-	Name ModelName `yaml:"name"`
-	Args []string  `yaml:"args,omitempty"`
-}
-
-type Network struct {
-	Host    string   `yaml:"host"`
-	Methods []string `yaml:"methods,omitempty"`
 }
 
 func Load() (cfg Config, returnedErr error) {
@@ -277,8 +290,9 @@ func Initialize() (returnErr error) {
 	startingConfig := Config{
 		DefaultModel: new(
 			Model{
-				Name: "claude",
-				Args: []string{"--model=opus"},
+				Name:    "claude",
+				Args:    nil,
+				KitArgs: []string{"model=opus"},
 			},
 		),
 		DefaultKits: nil,

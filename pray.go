@@ -58,12 +58,11 @@ func pray(ctx context.Context, args prayArgs) error {
 	if err := sbx.RunDetached(
 		ctx,
 		args.name,
-		// Use V3 models for sbx kit compatibility
-		project.Model.Name.V3(),
+		// project.Model should never be nil here (populated with cfg.DefaultModel if not set)
+		*project.Model,
 		project.AbsolutePath,
 		project.FullTemplateTag(),
 		project.Kits,
-		project.Model.Args,
 	); err != nil {
 		return err
 	}

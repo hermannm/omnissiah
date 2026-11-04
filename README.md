@@ -77,12 +77,17 @@ defaultModel:
   # Args to pass to the agent (optional)
   # See Claude CLI reference: https://code.claude.com/docs/en/cli-reference
   args:
-    - '--model=opus'
+    - '--max-budget-usd=5.00'
+  # Models are kits in sbx, so they can take kit arguments (formatted as key=value)
+  # For example, the built-in claude kit takes a 'model' argument - see 'args:' here:
+  # https://hub.docker.com/layers/sbx/claude/latest/images/latest/sbx-kit-spec
+  kitArgs:
+    - model=opus
 # sbx kits to apply to all Omnissiah prayers (agent sessions)
 # See sbx docs: https://docs.docker.com/ai/sandboxes/customize/use-kits/
 defaultKits:
   - path: docker.io/example/example-kit:1.0.0
-    # Kits may take arguments:
+    # Kits may take arguments - formatted as key=value:
     # https://docs.docker.com/ai/sandboxes/customize/use-kits/#pass-arguments-to-kits
     args:
       - EXAMPLE_ARG=true
