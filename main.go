@@ -105,14 +105,6 @@ func main() {
 					return commune(ctx)
 				},
 			},
-			{
-				Name:    "cortex",
-				Aliases: []string{"cc"},
-				Usage:   "Open the Cybernetica Cortex: the machine spirit control center",
-				Action: func(ctx context.Context, _ *cli.Command) error {
-					return cortex(ctx)
-				},
-			},
 		},
 		EnableShellCompletion: true,
 		Authors:               []any{"Hermann Mørkrid"},
@@ -132,10 +124,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-}
-
-func cortex(ctx context.Context) error {
-	return sbx.TerminalUI(ctx)
 }
 
 type sortArgs struct {

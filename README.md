@@ -60,7 +60,6 @@ COMMANDS:
    empower     Post-config setup (model provider auth, network policies, project bootstrap)
    pray, p     Start a new Omnissiah session in the current Git repo
    commune, c  Commune with existing machine spirits
-   cortex, cc  Open the Cybernetica Cortex: the machine spirit control center
    help, h     Shows a list of commands or help for one command
 ```
 

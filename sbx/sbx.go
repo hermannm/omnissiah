@@ -173,11 +173,6 @@ func RestartDaemon(ctx context.Context) (stdout []byte, err error) {
 	return sbxOutput(ctx, "daemon", "restart")
 }
 
-// https://docs.docker.com/reference/cli/sbx/tui/
-func TerminalUI(ctx context.Context) error {
-	return sbx(ctx, "tui")
-}
-
 // https://docs.docker.com/reference/cli/sbx/secret/set/
 func SetSecret(ctx context.Context, provider string) error {
 	return sbx(ctx, "secret", "set", provider)
