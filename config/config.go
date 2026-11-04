@@ -63,10 +63,6 @@ type Kit struct {
 	AbsolutePath string `yaml:"-"`
 	// Arguments to pass to the kit (Docker build args).
 	Args []string `yaml:"args,omitempty"`
-	// Host directories to mount into the sandbox, if the kit declares a host-mount capability.
-	// Format: HOST:SANDBOX_PATH
-	// https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-directories-for-kit-host-mounts
-	Mounts []string `yaml:"mounts,omitempty"`
 }
 
 // Name returns the sbx "name" of the kit, which is the last path component of the kit's path.
@@ -237,14 +233,10 @@ func (project Project) withDefaultConfig(cfg Config) Project {
 	return project
 }
 
-// Populates [Kit.AbsolutePath], and also expands homedir (~) in mount paths.
+// Populates [Kit.AbsolutePath].
 func setAbsoluteKitPaths(kits []Kit, homedir string) {
 	for i, kit := range kits {
 		kits[i].AbsolutePath = ExpandHomedir(kit.Path, homedir)
-
-		for j, mount := range kit.Mounts {
-			kits[i].Mounts[j] = ExpandHomedir(mount, homedir)
-		}
 	}
 }
 
