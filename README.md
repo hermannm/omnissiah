@@ -87,7 +87,7 @@ defaultModel:
 # See sbx docs: https://docs.docker.com/ai/sandboxes/customize/use-kits/
 defaultKits:
   - path: docker.io/example/example-kit:1.0.0
-    # Kits may take arguments - formatted as key=value:
+    # Kits may take arguments (formatted as key=value):
     # https://docs.docker.com/ai/sandboxes/customize/use-kits/#pass-arguments-to-kits
     args:
       - EXAMPLE_ARG=true
