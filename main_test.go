@@ -12,7 +12,7 @@ import (
 	"hermannm.dev/omnissiah/sbx"
 )
 
-func TestGetNumericNameForMachineSpirit(t *testing.T) {
+func TestGetRandomNameForMachineSpirit(t *testing.T) {
 	type testCase struct {
 		Test            string
 		ExistingSpirits []sbx.Sandbox
