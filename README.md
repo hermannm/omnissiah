@@ -44,6 +44,8 @@ sandboxing AI agents).
    ```shell
    alias omni='omnissiah'
    ```
+7. (Later) When configuring new Omnissiah projects, run `omnissiah empower <project-name>` to
+   bootstrap it
 
 ## Usage
 
@@ -102,14 +104,28 @@ allowedNetworks:
 # Project config: `omnissiah pray` can only be used under these paths
 # This is to avoid sharing unintended files with a machine spirit (AI agent)
 projects:
-  - path: ~/project1
-  - path: ~/project2
+  # Name is used as an identifier for project-related things, and cannot contain spaces
+  - name: project1
+    path: ~/project1
+  - name: project2
+    path: ~/project2
     # Use different model in this project
     model:
       name: codex
     # sbx kits to use for prayers in this project, in addition to `defaultKits`
     kits:
-      - docker.io/example/example-kit-2:1.0.0
+      - path: docker.io/example/example-kit-2:1.0.0
+    # Commands to run as part of `omnissiah empower` when bootstrapping the project template
+    # sbx docs on templates: https://docs.docker.com/reference/cli/sbx/template/
+    bootstrap:
+      # `cmd` runs the given command with `sbx` exec before saving the project template
+      # `sbx exec` docs: https://docs.docker.com/reference/cli/sbx/exec/
+      - cmd: pnpm install --frozen-lockfile
+      # `cp` copies a file or directory from your host to the sandbox before saving the template
+      # `sbx cp` docs: https://docs.docker.com/reference/cli/sbx/cp/
+      - cp:
+          from: ~/host-file-or-dir
+          to: ~/sandbox-file-or-dir
 ```
 
 ## Maintainer's guide

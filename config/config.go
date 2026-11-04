@@ -34,16 +34,31 @@ type Config struct {
 }
 
 type Project struct {
-	Path  string `yaml:"path"`
-	Model *Model `yaml:"model,omitempty"`
+	Name string `yaml:"name"`
+	Path string `yaml:"path"`
+	// Populated in [Load].
+	//exhaustruct:optional
+	AbsolutePath string `yaml:"-"`
+	Model        *Model `yaml:"model,omitempty"`
 	// sbx kits to apply to Omnissiah prayers in this project
-	Kits []Kit `yaml:"kits,omitempty"`
+	Kits      []Kit              `yaml:"kits,omitempty"`
+	Bootstrap []BootstrapCommand `yaml:"bootstrap,omitempty"`
+}
+
+func (project Project) TemplateName() string {
+	// Use omnissiah prefix to avoid conflicts
+	return "omnissiah-" + project.Name
+}
+
+// sbx saves local templates with a "docker.io/library/" prefix, and a "latest" tag by default.
+func (project Project) FullTemplateTag() string {
+	return "docker.io/library/" + project.TemplateName() + ":latest"
 }
 
 type Kit struct {
 	// From sbx docs: "directory, ZIP, git, or OCI"
 	Path string `yaml:"path"`
-	// Set with [Kit.setAbsolutePath].
+	// Set with [setAbsoluteKitPaths].
 	//exhaustruct:optional
 	AbsolutePath string `yaml:"-"`
 	// Arguments to pass to the kit (Docker build args).
@@ -66,6 +81,44 @@ func (kit Kit) Name() string {
 	// Then split the last path component
 	_, name = filepath.Split(name)
 	return name
+}
+
+// BootstrapCommand must contain either [BootstrapCommand.Cmd] OR [BootstrapCommand.Cp].
+type BootstrapCommand struct {
+	//exhaustruct:optional
+	Cmd string `yaml:"cmd,omitempty"`
+	//exhaustruct:optional
+	Cp *BootstrapCopy `yaml:"cp,omitempty"`
+}
+
+func (cmd BootstrapCommand) validate() error {
+	if cmd.Cmd == "" && cmd.Cp == nil {
+		return errors.New("bootstrap command must have either 'cmd' or 'cp' field")
+	}
+	if cmd.Cmd != "" && cmd.Cp != nil {
+		return errors.New("bootstrap command cannot have both 'cmd' and 'cp' fields")
+	}
+	return nil
+}
+
+type BootstrapCopy struct {
+	// Host path.
+	From string `yaml:"from"`
+	// Same as [BootstrapCopy.From], but with `~` expanded to the user's home dir.
+	FromAbsolute string `yaml:"-"`
+	// Sandbox path.
+	To string `yaml:"to"`
+	// Same as [BootstrapCopy.To], but with `~` expanded to `/home/agent`.
+	ToAbsolute string `yaml:"-"`
+}
+
+// The home directory for agents in Docker sandboxes:
+// https://docs.docker.com/ai/sandboxes/customize/author/build-an-agent/#create-the-agent-account
+const agentHomedir = "/home/agent"
+
+func (cp *BootstrapCopy) setAbsolutePaths(userHomedir string) {
+	cp.FromAbsolute = ExpandHomedir(cp.From, userHomedir)
+	cp.ToAbsolute = ExpandHomedir(cp.To, agentHomedir)
 }
 
 type Model struct {
@@ -106,22 +159,49 @@ func Load() (cfg Config, returnedErr error) {
 	cfg.Homedir = homedir
 	setAbsoluteKitPaths(cfg.DefaultKits, homedir)
 
-	// Expand uses of ~ in project paths
 	for i, project := range cfg.Projects {
-		cfg.Projects[i].Path = ExpandHomedir(project.Path, homedir)
+		cfg.Projects[i].AbsolutePath = ExpandHomedir(project.Path, homedir)
+		setAbsoluteKitPaths(project.Kits, homedir)
 
 		if project.Model == nil && cfg.DefaultModel == nil {
 			return Config{}, wrap.ErrorWithAttrs(
 				err,
-				"either `defaultModel` or `project.Model` must be set in config",
+				"either 'defaultModel' or 'project.model' must be set in config",
 				"path", configPath.Short,
 			)
 		}
 
-		setAbsoluteKitPaths(project.Kits, homedir)
+		for j, cmd := range project.Bootstrap {
+			if err := cmd.validate(); err != nil {
+				return Config{}, wrap.ErrorWithAttrs(
+					err,
+					"invalid bootstrap command",
+					"project", project.Name,
+					"index", j,
+				)
+			}
+
+			if cmd.Cp != nil {
+				cfg.Projects[i].Bootstrap[j].Cp.setAbsolutePaths(homedir)
+			}
+		}
 	}
 
 	return cfg, nil
+}
+
+func (cfg Config) GetProject(projectName string) (Project, error) {
+	project, ok := sliceutil.Find(
+		cfg.Projects,
+		func(project Project) bool {
+			return project.Name == projectName
+		},
+	)
+	if !ok {
+		return Project{}, fmt.Errorf("no project configured with name '%s'", projectName)
+	}
+
+	return project.withDefaultConfig(cfg), nil
 }
 
 func (cfg Config) GetCurrentProject() (Project, error) {
@@ -133,7 +213,7 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 	project, ok := sliceutil.Find(
 		cfg.Projects,
 		func(p Project) bool {
-			return strings.HasPrefix(path, p.Path)
+			return strings.HasPrefix(path, p.AbsolutePath)
 		},
 	)
 	if !ok {
@@ -143,6 +223,10 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		)
 	}
 
+	return project.withDefaultConfig(cfg), nil
+}
+
+func (project Project) withDefaultConfig(cfg Config) Project {
 	if project.Model == nil {
 		project.Model = cfg.DefaultModel
 	}
@@ -150,7 +234,7 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 	// Merge project-specific kits with default kits
 	project.Kits = slices.Concat(cfg.DefaultKits, project.Kits)
 
-	return project, nil
+	return project
 }
 
 // Populates [Kit.AbsolutePath], and also expands homedir (~) in mount paths.
@@ -210,9 +294,11 @@ func Initialize() (returnErr error) {
 			{Host: "registry.npmjs.org", Methods: []string{"GET"}},
 		},
 		Projects: []Project{{
-			Path:  filepath.Join("~", "example"),
-			Model: nil,
-			Kits:  nil,
+			Name:      "example",
+			Path:      filepath.Join("~", "example"),
+			Model:     nil,
+			Kits:      nil,
+			Bootstrap: nil,
 		}},
 	}
 
@@ -275,6 +361,8 @@ const (
 // Provider returns the model provider for the Model, or ok=false if it's unknown.
 //
 // See "Available services" here: https://docs.docker.com/reference/cli/sbx/secret/set/
+//
+//goland:noinspection GoUnusedConst
 func (model ModelName) Provider() (provider string, ok bool) {
 	switch model {
 	case ModelClaude:

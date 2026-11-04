@@ -16,12 +16,14 @@ import (
 	"hermannm.dev/omnissiah/config"
 )
 
-func Run(
+// https://docs.docker.com/reference/cli/sbx/run/
+func RunDetached(
 	ctx context.Context,
 	sandboxName string,
 	model string,
 	path string,
-	detached bool,
+	// Optional (blank when bootstrapping initial template)
+	templateTag string,
 	kits []config.Kit,
 	agentArgs []string,
 ) error {
@@ -30,14 +32,20 @@ func Run(
 		// Always run in clone mode, so the agent doesn't edit our own files:
 		// https://docs.docker.com/ai/sandboxes/usage/#clone-mode
 		"--clone",
+		// We create sandboxes by running them in detached mode, and then re-attaching after.
+		// This is to:
+		// 1) Keep it alive even when we exit the sandbox (which we want, to let tasks finish)
+		// 2) Be able to run setup commands before attaching
+		// https://docs.docker.com/ai/sandboxes/usage/#keep-a-sandbox-running-in-the-background
+		"--detach",
 		"--name",
 		sandboxName,
 		model,
 		path,
 	}
-	if detached {
-		// https://docs.docker.com/ai/sandboxes/usage/#keep-a-sandbox-running-in-the-background
-		sbxArgs = append(sbxArgs, "--detach")
+	if templateTag != "" {
+		sbxArgs = append(sbxArgs, "--pull", "never")
+		sbxArgs = append(sbxArgs, "--template", templateTag)
 	}
 
 	// sbx docs on mixin kits:
@@ -65,18 +73,40 @@ func Run(
 	return sbx(ctx, sbxArgs...)
 }
 
+// https://docs.docker.com/reference/cli/sbx/run/
 func RunExisting(ctx context.Context, sandboxName string) error {
 	return sbx(ctx, "run", "--name", sandboxName)
 }
 
+// https://docs.docker.com/reference/cli/sbx/run/
 func RunExistingDetached(ctx context.Context, sandboxName string) (stdout []byte, err error) {
 	return sbxOutput(ctx, "run", "--detach", "--name", sandboxName)
 }
 
+// https://docs.docker.com/reference/cli/sbx/exec/
+func Exec(ctx context.Context, sandboxName string, command string) error {
+	sbxArgs := []string{"exec", sandboxName}
+	commandArgs := strings.Split(command, " ")
+	sbxArgs = append(sbxArgs, commandArgs...)
+	return sbx(ctx, sbxArgs...)
+}
+
+// https://docs.docker.com/reference/cli/sbx/cp/
+func Copy(
+	ctx context.Context,
+	fromHostPath string,
+	toSandboxPath string,
+	sandboxName string,
+) error {
+	return sbx(ctx, "cp", fromHostPath, sandboxName+":"+toSandboxPath)
+}
+
+// https://docs.docker.com/reference/cli/sbx/stop/
 func Stop(ctx context.Context, sandboxName string) (stdout []byte, err error) {
 	return sbxOutput(ctx, "stop", sandboxName)
 }
 
+// https://docs.docker.com/reference/cli/sbx/rm/
 func Remove(ctx context.Context, sandboxName string, force bool) (stdout []byte, err error) {
 	args := []string{"rm", sandboxName}
 	if force {
@@ -85,6 +115,7 @@ func Remove(ctx context.Context, sandboxName string, force bool) (stdout []byte,
 	return sbxOutput(ctx, args...)
 }
 
+// https://docs.docker.com/reference/cli/sbx/prune/
 func Prune(ctx context.Context) error {
 	return sbx(ctx, "prune")
 }
@@ -98,6 +129,7 @@ const (
 	SettingDiagnosticsAutoUpload     Setting = "diagnostics.autoUpload"
 )
 
+// https://docs.docker.com/reference/cli/sbx/settings/set/
 func SetSetting(ctx context.Context, setting Setting, value string) (stdout []byte, err error) {
 	return sbxOutput(ctx, "settings", "set", string(setting), value)
 }
@@ -113,72 +145,46 @@ const (
 	NetworkPolicyDenyAll  NetworkPolicy = "deny-all"
 )
 
+// https://docs.docker.com/reference/cli/sbx/policy/init/
 func InitNetworkPolicy(ctx context.Context, policy NetworkPolicy) (stdout []byte, err error) {
 	return sbxOutput(ctx, "policy", "init", string(policy))
 }
 
+// https://docs.docker.com/reference/cli/sbx/policy/reset/
 func ResetPolicies(ctx context.Context) (stdout []byte, err error) {
 	return sbxOutput(ctx, "policy", "reset", "--force")
 }
 
+// https://docs.docker.com/reference/cli/sbx/policy/allow/network/
 func AllowNetwork(ctx context.Context, network config.Network) (stdout []byte, err error) {
 	args := []string{"policy", "allow", "network", network.Host}
 
 	if len(network.Methods) != 0 {
 		// --method docs: "Restrict the rule to these HTTP methods (comma-separated)"
-		// https://docs.docker.com/reference/cli/sbx/policy/allow/network/
 		args = append(args, "--method", strings.Join(network.Methods, ","))
 	}
 
 	return sbxOutput(ctx, args...)
 }
 
+// https://docs.docker.com/reference/cli/sbx/daemon/restart/
 func RestartDaemon(ctx context.Context) (stdout []byte, err error) {
 	return sbxOutput(ctx, "daemon", "restart")
 }
 
+// https://docs.docker.com/reference/cli/sbx/tui/
 func TerminalUI(ctx context.Context) error {
 	return sbx(ctx, "tui")
 }
 
+// https://docs.docker.com/reference/cli/sbx/secret/set/
 func SetSecret(ctx context.Context, provider string) error {
 	return sbx(ctx, "secret", "set", provider)
 }
 
+// https://docs.docker.com/reference/cli/sbx/ls/
 func List(ctx context.Context) ([]Sandbox, error) {
-	output, err := sbxOutput(ctx, "ls", "--json")
-	if err != nil {
-		return nil, err
-	}
-
-	// Annoyingly, sbx may show an update notice on `sbx ls`, even when we pass `--json`. This
-	// causes `json.Unmarshal` below to fail. So we check here if there's an update notice from sbx
-	// before unmarshaling JSON, by looking for the strange character "╭" in the output, since the
-	// update notice looks like this:
-	// ╭──────────────────────────────────────────────────────────────────────────────────╮
-	// │ Docker Sandboxes Update Available                                                │
-	// ├──────────────────────────────────────────────────────────────────────────────────┤
-	// │ v0.49.2  →  v0.50.1                                                              │
-	// ├──────────────────────────────────────────────────────────────────────────────────┤
-	// │ Release notes  https://github.com/docker/sbx-releases/releases/tag/v0.50.1       │
-	// ├──────────────────────────────────────────────────────────────────────────────────┤
-	// │ To upgrade     brew upgrade docker/tap/sbx                                       │
-	// ╰──────────────────────────────────────────────────────────────────────────────────╯
-	indexOfUpdateNotice := bytes.Index(output, []byte("╭"))
-	if indexOfUpdateNotice != -1 {
-		output = output[0:indexOfUpdateNotice]
-	}
-
-	var sandboxes []Sandbox
-	if err := json.Unmarshal(output, &sandboxes); err != nil {
-		return nil, wrap.ErrorWithAttrs(
-			err,
-			"failed to parse 'sbx ls' output as JSON",
-			"output", string(output),
-		)
-	}
-
-	return sandboxes, nil
+	return sbxJSONOutput[[]Sandbox](ctx, "ls", "--json")
 }
 
 type Sandbox struct {
@@ -205,13 +211,13 @@ const (
 	StatusStopped Status = "stopped"
 )
 
-func ValidateStatus(status string) (Status, error) {
+func validateStatus(status string) (Status, error) {
 	s := Status(status)
 	switch s {
 	case StatusRunning, StatusStopped:
 		return s, nil
 	default:
-		return s, fmt.Errorf("unknown sbx status value '%s'", status)
+		return "", fmt.Errorf("unknown sbx status value '%s'", status)
 	}
 }
 
@@ -221,8 +227,37 @@ func (status *Status) UnmarshalJSON(bytes []byte) (err error) {
 	if err := json.Unmarshal(bytes, &s); err != nil {
 		return err
 	}
-	*status, err = ValidateStatus(s)
+	*status, err = validateStatus(s)
 	return err
+}
+
+// https://docs.docker.com/reference/cli/sbx/template/ls/
+func ListTemplates(ctx context.Context) ([]Template, error) {
+	return sbxJSONOutput[[]Template](ctx, "template", "ls", "--json")
+}
+
+type Template struct {
+	ID         string `json:"id"`
+	Repository string `json:"repository"`
+	Tag        string `json:"tag"`
+	// This field is only present on base images, and contains e.g. "claude-code".
+	Flavor    string    `json:"flavor,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	Size      int64     `json:"size"`
+}
+
+// https://docs.docker.com/reference/cli/sbx/template/save/
+func SaveTemplate(
+	ctx context.Context,
+	sandboxName string,
+	templateName string,
+) error {
+	return sbx(ctx, "template", "save", sandboxName, templateName)
+}
+
+// https://docs.docker.com/reference/cli/sbx/template/rm/
+func RemoveTemplate(ctx context.Context, templateName string) (stdout []byte, err error) {
+	return sbxOutput(ctx, "template", "rm", "--force", templateName)
 }
 
 func sbx(ctx context.Context, args ...string) error {
@@ -246,7 +281,46 @@ func sbxOutput(ctx context.Context, args ...string) (stdout []byte, err error) {
 	if err != nil {
 		return nil, newError(err, args, false)
 	}
+
+	// Annoyingly, sbx may show an update notice on sbx commands, even when we pass `--json`, which
+	// causes `json.Unmarshal` to fail. So we check here if there's an update notice from sbx before
+	// unmarshaling JSON, by looking for the strange character "╭" in the output, since the update
+	// notice looks like this:
+	// ╭──────────────────────────────────────────────────────────────────────────────────╮
+	// │ Docker Sandboxes Update Available                                                │
+	// ├──────────────────────────────────────────────────────────────────────────────────┤
+	// │ v0.49.2  →  v0.50.1                                                              │
+	// ├──────────────────────────────────────────────────────────────────────────────────┤
+	// │ Release notes  https://github.com/docker/sbx-releases/releases/tag/v0.50.1       │
+	// ├──────────────────────────────────────────────────────────────────────────────────┤
+	// │ To upgrade     brew upgrade docker/tap/sbx                                       │
+	// ╰──────────────────────────────────────────────────────────────────────────────────╯
+	indexOfUpdateNotice := bytes.Index(stdout, []byte("╭"))
+	if indexOfUpdateNotice != -1 {
+		stdout = stdout[0:indexOfUpdateNotice]
+	}
+
 	return stdout, nil
+}
+
+func sbxJSONOutput[Output any](ctx context.Context, args ...string) (Output, error) {
+	var output Output
+
+	stdout, err := sbxOutput(ctx, args...)
+	if err != nil {
+		return output, err
+	}
+
+	if err := json.Unmarshal(stdout, &output); err != nil {
+		return output, wrap.ErrorWithAttrs(
+			err,
+			"failed to parse sbx output as JSON",
+			"command", "sbx "+strings.Join(args, " "),
+			"output", string(stdout),
+		)
+	}
+
+	return output, nil
 }
 
 type Error struct {
