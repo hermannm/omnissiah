@@ -10,7 +10,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.14.0
 	hermannm.dev/devlog v0.7.1
-	hermannm.dev/errclose v0.1.1
+	hermannm.dev/errclose v0.1.2
 	hermannm.dev/wrap v0.5.0
 )
 

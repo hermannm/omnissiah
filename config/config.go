@@ -140,7 +140,7 @@ func (cp *BootstrapCopy) setAbsolutePaths(userHomedir string) {
 	cp.ToAbsolute = ExpandHomedir(cp.To, agentHomedir)
 }
 
-func Load() (cfg Config, returnedErr error) {
+func Load() (cfg Config, returnErr error) {
 	homedir, err := os.UserHomeDir()
 	if err != nil {
 		return Config{}, wrap.Error(err, "could not get user home dir")
@@ -155,7 +155,7 @@ func Load() (cfg Config, returnedErr error) {
 			"path", configPath.Short,
 		)
 	}
-	defer errclose.Closef(configFile, &returnedErr, "config file %s", configPath.Short)
+	defer errclose.Closef(configFile, &returnErr, "config file %s", configPath.Short)
 
 	if err := yaml.NewDecoder(configFile).Decode(&cfg); err != nil {
 		return Config{}, wrap.ErrorWithAttrs(

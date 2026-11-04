@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"hermannm.dev/errclose"
 	"hermannm.dev/wrap"
 
 	"hermannm.dev/omnissiah/config"
@@ -62,7 +63,7 @@ func empower(ctx context.Context, args empowerArgs) error {
 	return nil
 }
 
-func bootstrapProject(ctx context.Context, project config.Project) error {
+func bootstrapProject(ctx context.Context, project config.Project) (returnErr error) {
 	templateName := project.TemplateName()
 
 	shouldContinue, err := removeExistingTemplate(ctx, templateName)
@@ -89,6 +90,15 @@ func bootstrapProject(ctx context.Context, project config.Project) error {
 		return err
 	}
 
+	// This machine spirit is only temporary for the bootstrap process, so we kill it after
+	defer errclose.Cleanupf(
+		func() error {
+			_, err := sbx.Remove(ctx, spiritName, true)
+			return err
+		},
+		&returnErr, "failed to kill machine spirit '%s' after bootstrap", spiritName,
+	)
+
 	for _, cmd := range project.Bootstrap {
 		if err := runBootstrapCommand(ctx, cmd, spiritName); err != nil {
 			return err
@@ -111,11 +121,6 @@ func bootstrapProject(ctx context.Context, project config.Project) error {
 			"failed to save template for project",
 			"templateName", templateName,
 		)
-	}
-
-	// TODO: Use errclose.Cleanup after RunDetached instead
-	if _, err := sbx.Remove(ctx, spiritName, true); err != nil {
-		return wrap.Errorf(err, "failed to kill machine spirit '%s' after bootstrap", spiritName)
 	}
 
 	slog.InfoContext(
