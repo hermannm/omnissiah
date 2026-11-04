@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"slices"
@@ -12,7 +11,6 @@ import (
 	"hermannm.dev/devlog/errlog"
 	"hermannm.dev/devlog/sloginit"
 
-	"hermannm.dev/omnissiah/internal/color"
 	"hermannm.dev/omnissiah/sbx"
 )
 
@@ -115,14 +113,6 @@ func main() {
 					return cortex(ctx)
 				},
 			},
-			{
-				Name:    "exterminatus",
-				Aliases: []string{"e"},
-				Usage:   "Commence Exterminatus on all machine spirits, killing them",
-				Action: func(ctx context.Context, _ *cli.Command) error {
-					return exterminatus(ctx)
-				},
-			},
 		},
 		EnableShellCompletion: true,
 		Authors:               []any{"Hermann Mørkrid"},
@@ -146,12 +136,6 @@ func main() {
 
 func cortex(ctx context.Context) error {
 	return sbx.TerminalUI(ctx)
-}
-
-func exterminatus(ctx context.Context) error {
-	fmt.Printf("Commencing %s\n", color.Red.On("EXTERMINATUS"))
-
-	return sbx.Prune(ctx)
 }
 
 type sortArgs struct {

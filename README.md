@@ -56,13 +56,12 @@ USAGE:
    omnissiah [global options] [command [command options]]
 
 COMMANDS:
-   awaken           Initialize Omnissiah config and set sbx defaults
-   empower          Post-config setup (model provider authentication, sbx network policies)
-   pray, p, pp      Start a new Omnissiah session in the current Git repo
-   commune, c       Commune with existing machine spirits
-   cortex, cc       Open the Cybernetica Cortex: the machine spirit control center
-   exterminatus, e  Commence Exterminatus on all machine spirits, killing them
-   help, h          Shows a list of commands or help for one command
+   awaken      Initialize Omnissiah config and set sbx defaults
+   empower     Post-config setup (model provider auth, network policies, project bootstrap)
+   pray, p     Start a new Omnissiah session in the current Git repo
+   commune, c  Commune with existing machine spirits
+   cortex, cc  Open the Cybernetica Cortex: the machine spirit control center
+   help, h     Shows a list of commands or help for one command
 ```
 
 ## Config

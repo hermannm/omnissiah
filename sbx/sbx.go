@@ -120,11 +120,6 @@ func RemoveAll(ctx context.Context) (stdout []byte, err error) {
 	return sbxOutput(ctx, "rm", "--all", "--force")
 }
 
-// https://docs.docker.com/reference/cli/sbx/prune/
-func Prune(ctx context.Context) error {
-	return sbx(ctx, "prune")
-}
-
 type Setting string
 
 // https://docs.docker.com/ai/sandboxes/configuration/settings/
