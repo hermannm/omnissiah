@@ -94,6 +94,8 @@ defaultKits:
   # When doing this, you may have to configure Docker to use the `containerd` image store:
   # https://docs.docker.com/desktop/features/containerd/#switch-image-stores
   - path: ~/.config/omnissiah/kits/example
+  # Kit paths starting with '.' are relative to the Omnissiah config file
+  - path: ./kits/example-2
 # Networks that we want to allow the machine spirit to connect to. The Omnissiah initializes the
 # network policy to `deny-all`, and only allows networks in this list, for full control
 # https://docs.docker.com/reference/cli/sbx/policy/allow/network/

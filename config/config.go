@@ -146,7 +146,7 @@ func Load() (cfg Config, returnErr error) {
 	if err != nil {
 		return Config{}, wrap.Error(err, "could not get user home dir")
 	}
-	configPath := getConfigPath(homedir)
+	configPath, configHome := getConfigPath(homedir)
 
 	configFile, err := os.Open(configPath.Absolute)
 	if err != nil {
@@ -167,7 +167,7 @@ func Load() (cfg Config, returnErr error) {
 	}
 	cfg.Path = configPath
 	cfg.Homedir = homedir
-	setAbsoluteKitPaths(cfg.DefaultKits, homedir)
+	setAbsoluteKitPaths(cfg.DefaultKits, homedir, configHome)
 
 	for i, project := range cfg.Projects {
 		if project.Model == nil && cfg.DefaultModel == nil {
@@ -178,7 +178,7 @@ func Load() (cfg Config, returnErr error) {
 			)
 		}
 
-		setAbsoluteKitPaths(project.Kits, homedir)
+		setAbsoluteKitPaths(project.Kits, homedir, configHome)
 		cfg.Projects[i].populateDefaults(cfg)
 		cfg.Projects[i].AbsolutePath = ExpandHomedir(project.Path, homedir)
 
@@ -263,9 +263,18 @@ func (project *Project) populateDefaults(cfg Config) {
 	project.Kits = slices.Concat(cfg.DefaultKits, project.Kits)
 }
 
-// Populates [Kit.AbsolutePath].
-func setAbsoluteKitPaths(kits []Kit, homedir string) {
+// Populates [Kit.AbsolutePath] by:
+//   - Expanding `~` to the user's homedir
+//   - Expanding `./` to the Omnissiah config home (`~/.config/omnissiah`)
+func setAbsoluteKitPaths(kits []Kit, homedir string, configHome Path) {
 	for i, kit := range kits {
+		split := splitPath(kit.Path)
+		if len(split) != 0 && split[0] == "." {
+			split[0] = configHome.Absolute
+			kits[i].AbsolutePath = filepath.Join(split...)
+			continue
+		}
+
 		kits[i].AbsolutePath = ExpandHomedir(kit.Path, homedir)
 	}
 }
@@ -275,7 +284,7 @@ func Initialize() (returnErr error) {
 	if err != nil {
 		return wrap.Error(err, "could not get user home dir")
 	}
-	configPath := getConfigPath(homedir)
+	configPath, _ := getConfigPath(homedir)
 
 	if fileExists(configPath.Absolute) {
 		slog.Info(fmt.Sprintf("%s already exists, skipping initialization", configPath.Short))
@@ -342,25 +351,26 @@ type Path struct {
 	Short    string
 }
 
-func getConfigPath(homedir string) Path {
+func getConfigPath(homedir string) (configPath Path, configHome Path) {
 	// Honor XDG_CONFIG_HOME env variable for config file directory
 	// https://specifications.freedesktop.org/basedir/latest/
-	configHome := os.Getenv("XDG_CONFIG_HOME")
-	if configHome == "" {
+	userConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if userConfigHome == "" {
 		// Default to ~/.config
-		configHome = filepath.Join("~", ".config")
+		userConfigHome = filepath.Join("~", ".config")
 	} else {
 		// If XDG_CONFIG_HOME is set, collapse home dir in path to ~, so we can return both variants
 		// below
-		configHome = CollapseHomedir(configHome, homedir)
+		userConfigHome = CollapseHomedir(userConfigHome, homedir)
 	}
 
-	path := filepath.Join(configHome, "omnissiah", "config.yml")
+	configHomeShort := filepath.Join(userConfigHome, "omnissiah")
+	configHome = Path{Short: configHomeShort, Absolute: ExpandHomedir(configHomeShort, homedir)}
 
-	return Path{
-		Absolute: ExpandHomedir(path, homedir),
-		Short:    path,
-	}
+	configPathShort := filepath.Join(configHomeShort, "config.yml")
+	configPath = Path{Short: configPathShort, Absolute: ExpandHomedir(configPathShort, homedir)}
+
+	return configPath, configHome
 }
 
 type ModelName string
@@ -446,4 +456,11 @@ func ExpandHomedir(path string, homedir string) (expandedPath string) {
 
 func CollapseHomedir(path string, homedir string) (collapsedPath string) {
 	return strings.Replace(path, homedir, "~", 1)
+}
+
+var pathSeparator = string([]byte{os.PathSeparator})
+
+// Splits the given file path into one string for each directory/file in the path.
+func splitPath(path string) []string {
+	return strings.Split(path, pathSeparator)
 }
