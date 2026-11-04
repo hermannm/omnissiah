@@ -67,6 +67,12 @@ func pray(ctx context.Context, args prayArgs) error {
 		return err
 	}
 
+	for _, cmd := range project.Startup {
+		if err := runConfiguredCommand(ctx, cmd, args.name, "startup"); err != nil {
+			return err
+		}
+	}
+
 	if err := sbx.RunExisting(ctx, args.name); err != nil {
 		return err
 	}

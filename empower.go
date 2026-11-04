@@ -54,6 +54,8 @@ func empower(ctx context.Context, args empowerArgs) error {
 
 	if !args.skipProjects {
 		for _, project := range cfg.Projects {
+			fmt.Println() // Newline for spacing
+
 			if err := bootstrapProject(ctx, project); err != nil {
 				return wrap.Errorf(err, "failed to bootstrap project '%s'", project.Name)
 			}
@@ -100,7 +102,7 @@ func bootstrapProject(ctx context.Context, project config.Project) (returnErr er
 	)
 
 	for _, cmd := range project.Bootstrap {
-		if err := runBootstrapCommand(ctx, cmd, spiritName); err != nil {
+		if err := runConfiguredCommand(ctx, cmd, spiritName, "bootstrap"); err != nil {
 			return err
 		}
 	}
@@ -130,17 +132,19 @@ func bootstrapProject(ctx context.Context, project config.Project) (returnErr er
 	return nil
 }
 
-func runBootstrapCommand(
+func runConfiguredCommand(
 	ctx context.Context,
-	cmd config.BootstrapCommand,
+	cmd config.Command,
 	spiritName string,
+	// Added as prefix to errors (e.g. "bootstrap" -> "bootstrap command failed").
+	context string,
 ) error {
 	switch {
 	case cmd.Cmd != "":
 		fmt.Print(color.Gray.On(fmt.Sprintf("> %s\n\n", cmd.Cmd)))
 
 		if err := sbx.Exec(ctx, spiritName, cmd.Cmd); err != nil {
-			return wrap.ErrorWithAttrs(err, "bootstrap command failed", "command", cmd.Cmd)
+			return wrap.ErrorWithAttrs(err, context+" command failed", "command", cmd.Cmd)
 		}
 	case cmd.Cp != nil:
 		fmt.Print(
@@ -157,7 +161,7 @@ func runBootstrapCommand(
 		); err != nil {
 			return wrap.ErrorWithAttrs(
 				err,
-				"bootstrap cp command failed",
+				context+" cp command failed",
 				"from", cmd.Cp.From,
 				"to", cmd.Cp.To,
 			)

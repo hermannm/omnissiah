@@ -41,8 +41,9 @@ type Project struct {
 	AbsolutePath string `yaml:"-"`
 	Model        *Model `yaml:"model,omitempty"`
 	// sbx kits to apply to Omnissiah prayers in this project
-	Kits      []Kit              `yaml:"kits,omitempty"`
-	Bootstrap []BootstrapCommand `yaml:"bootstrap,omitempty"`
+	Kits      []Kit     `yaml:"kits,omitempty"`
+	Bootstrap []Command `yaml:"bootstrap,omitempty"`
+	Startup   []Command `yaml:"startup,omitempty"`
 }
 
 func (project Project) TemplateName() string {
@@ -102,32 +103,32 @@ func getShortKitName(fullName string) string {
 	return name
 }
 
-// BootstrapCommand must contain either [BootstrapCommand.Cmd] OR [BootstrapCommand.Cp].
-type BootstrapCommand struct {
+// Command must contain either [Command.Cmd] OR [Command.Cp].
+type Command struct {
 	//exhaustruct:optional
 	Cmd string `yaml:"cmd,omitempty"`
 	//exhaustruct:optional
-	Cp *BootstrapCopy `yaml:"cp,omitempty"`
+	Cp *CopyCommand `yaml:"cp,omitempty"`
 }
 
-func (cmd BootstrapCommand) validate() error {
+func (cmd Command) validate() error {
 	if cmd.Cmd == "" && cmd.Cp == nil {
-		return errors.New("bootstrap command must have either 'cmd' or 'cp' field")
+		return errors.New("command must have either 'cmd' or 'cp' field")
 	}
 	if cmd.Cmd != "" && cmd.Cp != nil {
-		return errors.New("bootstrap command cannot have both 'cmd' and 'cp' fields")
+		return errors.New("command cannot have both 'cmd' and 'cp' fields")
 	}
 	return nil
 }
 
-type BootstrapCopy struct {
+type CopyCommand struct {
 	// Host path.
 	From string `yaml:"from"`
-	// Same as [BootstrapCopy.From], but with `~` expanded to the user's home dir.
+	// Same as [CopyCommand.From], but with `~` expanded to the user's home dir.
 	FromAbsolute string `yaml:"-"`
 	// Sandbox path.
 	To string `yaml:"to"`
-	// Same as [BootstrapCopy.To], but with `~` expanded to `/home/agent`.
+	// Same as [CopyCommand.To], but with `~` expanded to `/home/agent`.
 	ToAbsolute string `yaml:"-"`
 }
 
@@ -135,7 +136,7 @@ type BootstrapCopy struct {
 // https://docs.docker.com/ai/sandboxes/customize/author/build-an-agent/#create-the-agent-account
 const agentHomedir = "/home/agent"
 
-func (cp *BootstrapCopy) setAbsolutePaths(userHomedir string) {
+func (cp *CopyCommand) setAbsolutePaths(userHomedir string) {
 	cp.FromAbsolute = ExpandHomedir(cp.From, userHomedir)
 	cp.ToAbsolute = ExpandHomedir(cp.To, agentHomedir)
 }
@@ -169,9 +170,6 @@ func Load() (cfg Config, returnErr error) {
 	setAbsoluteKitPaths(cfg.DefaultKits, homedir)
 
 	for i, project := range cfg.Projects {
-		cfg.Projects[i].AbsolutePath = ExpandHomedir(project.Path, homedir)
-		setAbsoluteKitPaths(project.Kits, homedir)
-
 		if project.Model == nil && cfg.DefaultModel == nil {
 			return Config{}, wrap.ErrorWithAttrs(
 				err,
@@ -180,23 +178,44 @@ func Load() (cfg Config, returnErr error) {
 			)
 		}
 
-		for j, cmd := range project.Bootstrap {
-			if err := cmd.validate(); err != nil {
-				return Config{}, wrap.ErrorWithAttrs(
-					err,
-					"invalid bootstrap command",
-					"project", project.Name,
-					"index", j,
-				)
-			}
+		setAbsoluteKitPaths(project.Kits, homedir)
+		cfg.Projects[i].populateDefaults(cfg)
+		cfg.Projects[i].AbsolutePath = ExpandHomedir(project.Path, homedir)
 
-			if cmd.Cp != nil {
-				cfg.Projects[i].Bootstrap[j].Cp.setAbsolutePaths(homedir)
-			}
+		if err := validateAndPopulateCommands(project.Bootstrap, homedir); err != nil {
+			return Config{}, wrap.ErrorWithAttrs(
+				err,
+				"invalid bootstrap commands",
+				"project", project.Name,
+			)
+		}
+		if err := validateAndPopulateCommands(project.Startup, homedir); err != nil {
+			return Config{}, wrap.ErrorWithAttrs(
+				err,
+				"invalid startup commands",
+				"project", project.Name,
+			)
 		}
 	}
 
 	return cfg, nil
+}
+
+func validateAndPopulateCommands(commands []Command, homedir string) error {
+	for i, cmd := range commands {
+		if err := cmd.validate(); err != nil {
+			return wrap.ErrorWithAttrs(
+				err,
+				"invalid command",
+				"index", i,
+			)
+		}
+
+		if cmd.Cp != nil {
+			commands[i].Cp.setAbsolutePaths(homedir)
+		}
+	}
+	return nil
 }
 
 func (cfg Config) GetProject(projectName string) (Project, error) {
@@ -210,7 +229,7 @@ func (cfg Config) GetProject(projectName string) (Project, error) {
 		return Project{}, fmt.Errorf("no project configured with name '%s'", projectName)
 	}
 
-	return project.withDefaultConfig(cfg), nil
+	return project, nil
 }
 
 func (cfg Config) GetCurrentProject() (Project, error) {
@@ -232,18 +251,16 @@ func (cfg Config) GetCurrentProject() (Project, error) {
 		)
 	}
 
-	return project.withDefaultConfig(cfg), nil
+	return project, nil
 }
 
-func (project Project) withDefaultConfig(cfg Config) Project {
+func (project *Project) populateDefaults(cfg Config) {
 	if project.Model == nil {
 		project.Model = cfg.DefaultModel
 	}
 
 	// Merge project-specific kits with default kits
 	project.Kits = slices.Concat(cfg.DefaultKits, project.Kits)
-
-	return project
 }
 
 // Populates [Kit.AbsolutePath].
@@ -305,6 +322,7 @@ func Initialize() (returnErr error) {
 			Model:     nil,
 			Kits:      nil,
 			Bootstrap: nil,
+			Startup:   nil,
 		}},
 	}
 
