@@ -67,7 +67,7 @@ func RunDetached(
 		}
 		// https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-directories-for-kit-host-mounts
 		for _, mount := range kit.Mounts {
-			sbxArgs = append(sbxArgs, "--mount", mount)
+			sbxArgs = append(sbxArgs, "--mount", mount.FullPathAbsolute)
 		}
 	}
 

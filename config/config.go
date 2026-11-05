@@ -83,9 +83,8 @@ type Kit struct {
 	// Arguments to pass to the kit (Docker build args).
 	Args []string `yaml:"args,omitempty"`
 	// Host directories to mount into the sandbox, if the kit declares a host-mount capability.
-	// Format: HOST_PATH:SANDBOX_PATH
 	// https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-directories-for-kit-host-mounts
-	Mounts []string `yaml:"mounts,omitempty"`
+	Mounts []Mount `yaml:"mounts,omitempty"`
 }
 
 // ShortName returns the sbx "name" of the kit, which is the last path component of the kit's path.
@@ -105,6 +104,42 @@ func getShortKitName(fullName string) string {
 	// Then split the last path component
 	_, name = filepath.Split(name)
 	return name
+}
+
+// Represented as a string in YAML, on the format <host-path>:<sandbox-path>.
+type Mount struct {
+	// <host-path>:<sandbox-path>
+	FullPath string
+	// Populated by [Mount.setAbsolutePaths].
+	FullPathAbsolute string
+	HostPath         string
+	// Populated by [Mount.setAbsolutePaths].
+	HostPathAbsolute string
+	SandboxPath      string
+}
+
+const mountSeparator = ":"
+
+func (mount *Mount) UnmarshalYAML(data []byte) error {
+	if err := yaml.Unmarshal(data, &mount.FullPath); err != nil {
+		return err
+	}
+
+	split := strings.Split(mount.FullPath, mountSeparator)
+	if len(split) != 2 {
+		return fmt.Errorf(
+			"mount path must be on format '<host-path>:<sandbox-path>', got '%s'",
+			mount.FullPath,
+		)
+	}
+	mount.HostPath = split[0]
+	mount.SandboxPath = split[1]
+	return nil
+}
+
+func (mount *Mount) setAbsolutePaths(homedir string) {
+	mount.HostPathAbsolute = ExpandHomedir(mount.HostPath, homedir)
+	mount.FullPathAbsolute = mount.HostPathAbsolute + mountSeparator + mount.SandboxPath
 }
 
 // Command must contain either [Command.Cmd] OR [Command.Cp].
@@ -280,8 +315,8 @@ func setAbsoluteKitPaths(kits []Kit, homedir string, configHome Path) {
 			kits[i].AbsolutePath = filepath.Join(split...)
 		}
 
-		for j, mount := range kit.Mounts {
-			kit.Mounts[j] = ExpandHomedir(mount, homedir)
+		for j := range kit.Mounts {
+			kit.Mounts[j].setAbsolutePaths(homedir)
 		}
 	}
 }
