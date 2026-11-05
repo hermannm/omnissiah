@@ -89,6 +89,10 @@ defaultKits:
     # https://docs.docker.com/ai/sandboxes/customize/use-kits/#pass-arguments-to-kits
     args:
       - EXAMPLE_ARG=true
+    # Kits may also declare directories to mount from the host:
+    # https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-directories-for-kit-host-mounts
+    mounts:
+      - ~/local/path:/home/agent/sandbox/path
   # Kit paths may point to your file system, see sbx docs:
   # https://docs.docker.com/ai/sandboxes/customize/author/tool-mixins/
   # When doing this, you may have to configure Docker to use the `containerd` image store:

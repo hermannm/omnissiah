@@ -82,6 +82,10 @@ type Kit struct {
 	AbsolutePath string `yaml:"-"`
 	// Arguments to pass to the kit (Docker build args).
 	Args []string `yaml:"args,omitempty"`
+	// Host directories to mount into the sandbox, if the kit declares a host-mount capability.
+	// Format: HOST_PATH:SANDBOX_PATH
+	// https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-directories-for-kit-host-mounts
+	Mounts []string `yaml:"mounts,omitempty"`
 }
 
 // ShortName returns the sbx "name" of the kit, which is the last path component of the kit's path.
@@ -268,14 +272,17 @@ func (project *Project) populateDefaults(cfg Config) {
 //   - Expanding `./` to the Omnissiah config home (`~/.config/omnissiah`)
 func setAbsoluteKitPaths(kits []Kit, homedir string, configHome Path) {
 	for i, kit := range kits {
+		kits[i].AbsolutePath = ExpandHomedir(kit.Path, homedir)
+
 		split := splitPath(kit.Path)
 		if len(split) != 0 && split[0] == "." {
 			split[0] = configHome.Absolute
 			kits[i].AbsolutePath = filepath.Join(split...)
-			continue
 		}
 
-		kits[i].AbsolutePath = ExpandHomedir(kit.Path, homedir)
+		for j, mount := range kit.Mounts {
+			kit.Mounts[j] = ExpandHomedir(mount, homedir)
+		}
 	}
 }
 

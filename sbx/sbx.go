@@ -65,6 +65,10 @@ func RunDetached(
 		for _, arg := range kit.Args {
 			sbxArgs = append(sbxArgs, "--kit-arg", name+"."+arg)
 		}
+		// https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-directories-for-kit-host-mounts
+		for _, mount := range kit.Mounts {
+			sbxArgs = append(sbxArgs, "--mount", mount)
+		}
 	}
 
 	if len(model.Args) != 0 {
